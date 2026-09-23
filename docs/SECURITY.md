@@ -27,3 +27,8 @@ No independent penetration test or security certification is claimed. Before ope
 ## Durable import controls (1.1)
 
 Queue and cancellation routes require the separate ingestion token. The operations dashboard holds it only in page memory, clears the input immediately, removes private details on lock/navigation, and does not put it in localStorage, URLs or share links. The queue admits canonical board tokens only; callers cannot choose a worker request destination. Run metadata omits snapshots and lease tokens. Database-owned fencing protects cancelled/reclaimed jobs at commit. Empty/invalid/expired snapshots do not reconcile missing rows. A job-attempt budget bounds new paid indexing attempts, not exact provider charges. Keep provider-side spending controls enabled. The container runs as UID 10001 and supports a read-only root filesystem.
+
+
+## Source schedules (1.2)
+
+All schedule configuration and run-now endpoints require live PostgreSQL and the distinct ingestion token. The UI creates paused schedules and a separate worker flag opts into recurring dispatch. Fixed board-token validation prevents arbitrary target URLs; strict payload types, revision checks, admission caps and the existing daily job-attempt limits constrain writes. Pausing does not revoke a provider request already made. Client aborts do not undo committed mutations. No tokens enter local/session storage, screenshots, schedule rows or source bundles.

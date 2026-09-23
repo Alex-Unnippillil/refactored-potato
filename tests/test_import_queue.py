@@ -36,7 +36,7 @@ def queue(monkeypatch):
     with psycopg.connect(os.environ['TEST_DATABASE_URL'], autocommit=True) as conn:
         for migration in sorted((root/'sql').glob('*.sql')):
             conn.execute(migration.read_text())
-        conn.execute('TRUNCATE import_runs,worker_heartbeat,jobs,job_chunks,sources,usage_buckets CASCADE')
+        conn.execute('TRUNCATE source_schedules,import_runs,worker_heartbeat,jobs,job_chunks,sources,usage_buckets CASCADE')
     return ImportQueue()
 
 

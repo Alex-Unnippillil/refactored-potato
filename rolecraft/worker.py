@@ -12,16 +12,25 @@ from .import_queue import BATCH_SIZE, MAX_JOBS, ImportQueue, LeaseLost
 from .ingest import fetch_board
 from .models import Job
 from .providers import ProviderError
+from .schedules import SourceSchedules, scheduler_enabled
 
 log = logging.getLogger('rolecraft.worker')
 
 
-def tick(queue=None) -> bool:
+def tick(queue=None, *, schedule: bool = False) -> bool:
     queue = queue or ImportQueue()
     queue.heartbeat()
+    dispatched = None
+    if schedule:
+        try:
+            dispatched = SourceSchedules(queue).dispatch_due()
+        except Exception as exc:
+            # Scheduler failure must not starve already-admitted work. Never
+            # log driver messages or credentials.
+            log.error('schedule_dispatch_failed type=%s', type(exc).__name__)
     run = queue.claim()
     if not run:
-        return False
+        return bool(dispatched)
     try:
         if run.get('snapshot_at') and run['snapshot_at'] < datetime.now(timezone.utc) - timedelta(days=1):
             raise ValueError('Snapshot expired; queue a fresh run before reconciling.')
@@ -68,7 +77,7 @@ def main() -> int:
             return 0
         while not stop.is_set():
             try:
-                busy = tick()
+                busy = tick(schedule=scheduler_enabled())
             except Exception as exc:
                 log.error('worker_unavailable type=%s', type(exc).__name__)
                 if args.once:

@@ -18,7 +18,7 @@ from rolecraft.search import search
 from rolecraft.store import PostgresStore, get_store
 
 ROOT = Path(__file__).resolve().parent
-app = FastAPI(title='Rolecraft Hybrid Job Search', version='1.1.0', docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title='Rolecraft Hybrid Job Search', version='1.2.0', docs_url=None, redoc_url=None, openapi_url=None)
 logger = logging.getLogger('rolecraft')
 
 CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; base-uri 'self'"
@@ -98,7 +98,7 @@ def icon():
 
 @app.get('/api/health')
 def health():
-    return {'status':'ok','service':'rolecraft','version':'1.1.0'}
+    return {'status':'ok','service':'rolecraft','version':'1.2.0'}
 
 
 @app.get('/api/status')

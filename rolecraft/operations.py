@@ -6,17 +6,18 @@ import re
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .import_queue import ImportQueue, QueueBudget, QueueConflict, board_token
+from .schedules import SourceSchedules, ScheduleMissing
 from .models import Filters
 from .providers import EMBEDDING_MODEL
 from .store import get_store, where_clause
 
-VERSION = '1.1.0'
+VERSION = '1.2.0'
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -28,6 +29,21 @@ class QueueRequest(BaseModel):
     @classmethod
     def validate_board(cls, value):
         return board_token(value)
+
+
+class ScheduleRequest(QueueRequest):
+    interval_hours: int = Field(default=24, ge=6, le=168, strict=True)
+    enabled: bool = Field(default=False, strict=True)
+
+
+class RevisionRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    expected_revision: int = Field(ge=1, strict=True)
+
+
+class ScheduleUpdate(RevisionRequest):
+    interval_hours: int = Field(ge=6, le=168, strict=True)
+    enabled: bool = Field(strict=True)
 
 
 def release_info():
@@ -55,7 +71,7 @@ def readiness(store=None):
         try:
             store = store or get_store()
             with store.connect() as conn:
-                present = conn.execute("SELECT to_regclass('jobs') AS jobs,to_regclass('job_chunks') AS chunks,to_regclass('import_runs') AS queue,to_regclass('worker_heartbeat') AS heartbeat").fetchone()
+                present = conn.execute("SELECT to_regclass('jobs') AS jobs,to_regclass('job_chunks') AS chunks,to_regclass('import_runs') AS queue,to_regclass('worker_heartbeat') AS heartbeat,to_regclass('source_schedules') AS schedules").fetchone()
                 vector = conn.execute("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname='vector') AS installed").fetchone()['installed']
                 schema = all(present.values()) and vector
                 add('database', 'Database connectivity', True, 'PostgreSQL responded; connection details are never exposed.')
@@ -108,6 +124,10 @@ def router(authorize, safe_operation):
         result = readiness()
         schema_ok = any(c['key'] == 'schema' and c['ok'] for c in result['checks'])
         result['runs'] = safe_operation(lambda: ImportQueue().recent()) if live and schema_ok else []
+        result.update({'schedules': [], 'scheduler': {'configured': False, 'worker': None}, 'budgets': None})
+        if live and schema_ok:
+            result.update(safe_operation(lambda: SourceSchedules().overview()))
+        result['can_schedule'] = live and schema_ok and os.getenv('INGEST_TOKEN') != os.getenv('APP_ACCESS_TOKEN')
         result['can_enqueue'] = live and schema_ok and bool(os.getenv('OPENAI_API_KEY')) and os.getenv('INGEST_TOKEN') != os.getenv('APP_ACCESS_TOKEN')
         return result
 
@@ -139,5 +159,57 @@ def router(authorize, safe_operation):
             except QueueConflict as exc:
                 raise HTTPException(409, str(exc)) from exc
         return safe_operation(run)
+
+    def operator_live(request):
+        authorize(request, admin=True)
+        if not os.getenv('DATABASE_URL'):
+            raise HTTPException(503, 'The demo is read-only. Schedules require PostgreSQL and operator access.')
+
+    def checked_board(value):
+        try:
+            return board_token(value)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    def schedule_operation(operation):
+        def run():
+            try:
+                return operation()
+            except ScheduleMissing as exc:
+                raise HTTPException(404, str(exc)) from exc
+            except QueueBudget as exc:
+                raise HTTPException(429, str(exc)) from exc
+            except QueueConflict as exc:
+                raise HTTPException(409, str(exc)) from exc
+        return safe_operation(run)
+
+    @routes.post('/api/source-schedules')
+    def create_schedule(payload: ScheduleRequest, request: Request):
+        operator_live(request)
+        row = schedule_operation(lambda: SourceSchedules().create(payload.board, payload.interval_hours, payload.enabled))
+        return JSONResponse(jsonable_encoder({'schedule': row}), status_code=201)
+
+    @routes.put('/api/source-schedules/{board}')
+    def update_schedule(board: str, payload: ScheduleUpdate, request: Request):
+        operator_live(request)
+        board = checked_board(board)
+        return {'schedule': schedule_operation(lambda: SourceSchedules().update(
+            board, payload.interval_hours, payload.enabled, payload.expected_revision))}
+
+    @routes.delete('/api/source-schedules/{board}')
+    def remove_schedule(board: str, request: Request, expected_revision: int = Query(ge=1)):
+        operator_live(request)
+        board = checked_board(board)
+        schedule_operation(lambda: SourceSchedules().remove(board, expected_revision))
+        return {'removed': True, 'notice': 'Only the schedule was removed. Admitted runs and indexed jobs were preserved.'}
+
+    @routes.post('/api/source-schedules/{board}/run')
+    def run_schedule_now(board: str, payload: RevisionRequest, request: Request):
+        operator_live(request)
+        board = checked_board(board)
+        if not os.getenv('OPENAI_API_KEY'):
+            raise HTTPException(503, 'Configure embedding credentials and start the worker before importing.')
+        job, created = schedule_operation(lambda: SourceSchedules().run_now(board, payload.expected_revision))
+        return JSONResponse(jsonable_encoder({'run': job, 'created': created}), status_code=202 if created else 200)
 
     return routes

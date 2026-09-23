@@ -4,9 +4,9 @@
 
 ![CI](https://github.com/Alex-Unnippillil/refactored-potato/actions/workflows/ci.yml/badge.svg)
 
-**Release 1.1 — durable imports, operational readiness, and reproducible delivery.**
+**Release 1.2 — opt-in scheduled sources, freshness diagnostics, and concurrency-safe operator controls.**
 
-[Run locally](#run-the-demo) · [Live workspace](#live-workspace) · [Durable imports](docs/RELIABLE_IMPORTS.md) · [Operations](docs/OPERATIONS.md) · [Security](docs/SECURITY.md)
+[Run locally](#run-the-demo) · [Live workspace](#live-workspace) · [Scheduled sources](docs/SCHEDULED_SOURCES.md) · [Durable imports](docs/RELIABLE_IMPORTS.md) · [Operations](docs/OPERATIONS.md) · [Security](docs/SECURITY.md)
 
 Rolecraft is a complete job-search workspace built around a hybrid retrieval pipeline: structured SQL constraints, full-text search, description vectors, reciprocal-rank fusion, re-ranking, and source-backed evidence briefs. A responsive interface makes the pipeline useful rather than hiding it behind a chat box.
 
@@ -22,11 +22,17 @@ The screenshots below are captured from the **running HTTP demo**, not design mo
 ### Operations — desktop
 ![Rolecraft operations: actual demo counts, readiness checks, disabled live import control and honest empty run history](docs/assets/operations-desktop.png)
 
+### Source scheduling — paused and opt-in by design
+![Rolecraft source scheduling: empty read-only demo, paused-source setup controls and no fabricated worker activity](docs/assets/schedules-desktop.png)
+
+
 <details>
 <summary>Mobile screenshots — 390-pixel viewport, captured at 2× resolution</summary>
 
 <img src="docs/assets/workspace-mobile.png" width="390" alt="Rolecraft job search on a narrow mobile viewport">
 <img src="docs/assets/operations-mobile.png" width="390" alt="Rolecraft operational readiness on a narrow mobile viewport">
+
+<img src="docs/assets/schedules-mobile.png" width="390" alt="Scheduled-source setup on a narrow mobile viewport; demo mutations are disabled">
 
 </details>
 
@@ -45,6 +51,7 @@ The web process handles bounded requests. PostgreSQL owns the durable import sta
 - Live PostgreSQL/pgvector storage, Greenhouse board imports, an allowlisted Firecrawl adapter, and validated JSON imports. Optional Cohere re-ranking and OpenAI excerpt selection.
 - A durable Greenhouse import queue: one persisted snapshot, restartable five-job units, fenced leases, cancellation, bounded retries, job-attempt budgets and closure only on complete success.
 - An operator dashboard at `/operations` with actual readiness, run history, refresh controls and a recent-worker heartbeat. The demo never invents worker activity.
+- Opt-in recurring Greenhouse refreshes: paused-by-default sources, 6–168-hour intervals, revision-checked edits, pause/resume, manual refresh, source freshness and shared queue budgets. Missed intervals coalesce instead of replaying.
 - Additive migrations, operator and worker CLIs, real PostgreSQL concurrency tests, three-browser verification, non-root container smoke tests, and reproducible screenshots.
 
 ## Run the demo
@@ -98,6 +105,7 @@ On PowerShell, use `$env:DATABASE_URL = '...'` instead of `export`. Environment 
 | `OPENAI_CHAT_MODEL` | Optional model supporting strict JSON-schema responses, for selecting source excerpts. No default generative model is enabled. |
 | `DAILY_SEARCH_LIMIT` | Daily per-workspace limit for searches **and separately** briefs; default 250 each. Imports have a separate limit capped at 50 requests/day. |
 | `DAILY_IMPORT_JOB_LIMIT` | Durable worker job-attempt budget per UTC day; default 200, bounded 5–2,000. Failed/repeated attempts count too. |
+| `IMPORT_SCHEDULER_ENABLED` | Worker opt-in (`true` or `1`); default off. Saved schedules must also be enabled. Set consistently on web and worker for diagnostics. |
 | `SOURCE_FRESH_DAYS` | Exclude live records not refreshed within this many days; default 14, bounded 1–90. |
 
 Generate different access tokens locally using a trusted password manager or `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Store them in your deployment secret manager, not this repository or a chat message. The web client keeps access tokens only in page memory. This is a **single private workspace**, not a multi-tenant account/SSO system.
@@ -110,9 +118,15 @@ python -m rolecraft.worker
 python -m rolecraft.worker --once
 ```
 
-Open **`/operations`**, unlock with the ingestion token, and queue a Greenhouse board token. Imports persist across browser refreshes and worker restarts. Run `python scripts/manage.py migrate` before the web/worker upgrade; it now applies both numbered migrations. [State machine, limits, deployment and recovery](docs/RELIABLE_IMPORTS.md).
+Open **`/operations`**, unlock with the ingestion token, and queue a Greenhouse board token. Imports persist across browser refreshes and worker restarts. Run `python scripts/manage.py migrate` before the web/worker upgrade; it applies all three numbered migrations. [State machine, limits, deployment and recovery](docs/RELIABLE_IMPORTS.md).
 
-### 4. Direct import compatibility
+### 4. Optional recurring source refreshes
+
+On `/operations`, add a Greenhouse board under **Scheduled source refreshes**. It starts **paused**. Set `IMPORT_SCHEDULER_ENABLED=true` on the separate worker, restart it, and click **Resume**. The same queue budgets apply to manual and scheduled imports. Pausing or removing a schedule preserves indexed jobs and already queued runs; cancel those runs separately. Edits carry a revision to prevent one session overwriting another.
+
+Per-source counts use the retrieval freshness and expiry rules. A successful scheduler heartbeat is not provider-health verification. [Scheduling, API/CLI contracts, budgets and rollback](docs/SCHEDULED_SOURCES.md).
+
+### 5. Direct import compatibility
 
 In **Data sources**, enter a Greenhouse board token or an allowlisted Firecrawl job-page URL and the separate ingestion token. The UI imports a bounded batch of at most five Greenhouse jobs. The CLI can visit all batches:
 
@@ -175,7 +189,7 @@ Do not treat a successful `/api/health` response as database/provider readiness.
 
 ```sh
 python -m pip install -r requirements-dev.txt
-python -m pytest -q
+python -m pytest tests --ignore=tests/test_ui.py --ignore=tests/test_schedules_ui.py -q
 python scripts/evaluate.py
 node --check public/app.js
 ```
@@ -186,12 +200,12 @@ For actual browser/HTTP tests, start the app at port 8000, then:
 
 ```sh
 python -m playwright install --with-deps chromium firefox webkit
-RUN_UI_TESTS=1 TEST_BROWSER=chromium python -m pytest tests/test_ui.py -q
-RUN_UI_TESTS=1 TEST_BROWSER=firefox python -m pytest tests/test_ui.py -q
-RUN_UI_TESTS=1 TEST_BROWSER=webkit python -m pytest tests/test_ui.py -q
+RUN_UI_TESTS=1 TEST_BROWSER=chromium python -m pytest tests/test_ui.py tests/test_schedules_ui.py -q
+RUN_UI_TESTS=1 TEST_BROWSER=firefox python -m pytest tests/test_ui.py tests/test_schedules_ui.py -q
+RUN_UI_TESTS=1 TEST_BROWSER=webkit python -m pytest tests/test_ui.py tests/test_schedules_ui.py -q
 ```
 
-On Windows, set the two variables with `$env:RUN_UI_TESTS='1'` and `$env:TEST_BROWSER='chromium'` before invoking pytest. CI provisions a real pgvector database and uses normal browser HTTP navigation without mocks. An optional `UI_TEST_MODE=bridge` harness supports restricted offline sandboxes; its network/history/storage substitutions **do not constitute deployment, CSP, browser persistence or network verification**.
+On Windows, set the two variables with `$env:RUN_UI_TESTS='1'` and `$env:TEST_BROWSER='chromium'` before invoking pytest. CI provisions a real pgvector database and uses normal HTTP for demo and authenticated operations navigation. Private scheduling tests advance a real worker with synthetic upstream/embedding fixtures; one privacy race deliberately delays a real HTTP response. They do not use a fake database or replace API response data. An optional `UI_TEST_MODE=bridge` harness supports restricted offline sandboxes; its network/history/storage substitutions **do not constitute deployment, CSP, browser persistence or network verification**.
 
 The evaluator reports MRR and nDCG@10 over eight authored queries against the fictional corpus. These are reproducible regression diagnostics, **not a held-out benchmark or evidence of real-world hiring quality**.
 
@@ -208,10 +222,12 @@ rolecraft/ingest.py        Greenhouse and allowlisted Firecrawl adapters
 rolecraft/brief.py         Extractive / AI-selected source-checked briefs
 rolecraft/import_queue.py  PostgreSQL admission, leases, cursor checkpoints, cancellation
 rolecraft/worker.py        Separate bounded snapshot/indexing worker
+rolecraft/schedules.py     Opt-in transactional schedule dispatch and source diagnostics
 rolecraft/operations.py    Safe readiness, queue API and operator pages
 public/                   Responsive dependency-free interface
 sql/001_init.sql          PostgreSQL/pgvector schema and indexes
 sql/002_imports.sql       Additive durable run and heartbeat schema
+sql/003_schedules.sql     Additive source schedules, revisions and due-time index
 Dockerfile               Non-root, read-only-compatible web/worker image
 compose.app.yml          Local demo plus explicit live worker profile
 scripts/manage.py         Migration, source sync and inspection CLI
@@ -222,9 +238,9 @@ tests/                   API, security, retrieval, database and browser tests
 
 ## Limits and next scaling steps
 
-This release does not include recurring crawling, application submission, resume ingestion, employer verification, account synchronization, per-user permissions, a managed worker hosting service, or a pretrained offline embedding model. No provider account or paid database is provisioned by the source code. Source freshness is bounded, not real-time. Authored culture signals are lexical evidence cues and do not robustly understand negation, sarcasm or workplace truth; confirm them with an employer.
+This release does not include recurring collection beyond the opt-in Greenhouse queue, application submission, resume ingestion, employer verification, account synchronization, per-user permissions, a managed worker hosting service, or a pretrained offline embedding model. No provider account or paid database is provisioned by the source code. Source freshness is bounded, not real-time. Authored culture signals are lexical evidence cues and do not robustly understand negation, sarcasm or workplace truth; confirm them with an employer.
 
-For a public multi-user service, replace the shared token with an audited identity provider and tenant-scoped authorization, add per-user quotas/rate controls, operate the included durable import queue and add periodic source scheduling, run a real labelled retrieval evaluation, and add monitoring/backups. Keep operator imports private. Review source terms, robots policies and licensing before collection; the app does not bypass access controls.
+For a public multi-user service, replace the shared token with an audited identity provider and tenant-scoped authorization, add per-user quotas/rate controls, operate the included durable import queue and opt-in source scheduler, run a real labelled retrieval evaluation, and add monitoring/backups. Keep operator imports private. Review source terms, robots policies and licensing before collection; the app does not bypass access controls.
 
 ### Technical references
 
@@ -238,4 +254,7 @@ For a public multi-user service, replace the shared token with an audited identi
 
 ## Release verification
 
-The CI workflow runs every backend test against a disposable pgvector database, checks JavaScript syntax, tests normal HTTP navigation in Chromium/Firefox/WebKit, captures four screenshots, and builds/runs the non-root Docker image. Live providers are mocked at their boundaries; these tests do not prove real provider credentials or paid quotas are available. See [the durable-import runbook](docs/RELIABLE_IMPORTS.md) before enabling live collection.
+The CI workflow runs every backend test against a disposable pgvector database, checks JavaScript syntax, tests normal HTTP navigation in Chromium/Firefox/WebKit, captures six screenshots, and builds/runs the non-root Docker image. Live providers are mocked at their boundaries; these tests do not prove real provider credentials or paid quotas are available. See [the durable-import runbook](docs/RELIABLE_IMPORTS.md) before enabling live collection.
+
+
+A passing CI run also publishes a **tracked-source ZIP** (`rolecraft-source`) and the current screenshot artifact. The source bundle excludes local environment files, untracked files and Git credentials; it is not a standalone installer and still needs the documented runtime dependencies. [Changelog](CHANGELOG.md).

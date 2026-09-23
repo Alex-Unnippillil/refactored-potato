@@ -33,3 +33,8 @@ Initial connector-based publication used a temporary checksum-verified, source-o
 ## Version 1.1
 
 Apply all numbered migrations with `python scripts/manage.py migrate` before upgrading the web and worker. The new `/api/readiness` endpoint separates configured storage readiness from liveness and paid-provider health. See [durable import operations](RELIABLE_IMPORTS.md) for fencing, cancellation, budgets, snapshot retention and rollback.
+
+
+## Release 1.2: opt-in source scheduling
+
+Apply `003_schedules.sql` before upgrading. New schedules start paused in the interface; the worker separately requires `IMPORT_SCHEDULER_ENABLED=true`. Source freshness diagnostics, revision-checked operator controls, atomic shared-queue admission, budget deferral and rollback instructions are in [SCHEDULED_SOURCES.md](SCHEDULED_SOURCES.md). Schedule pause/removal does not cancel admitted work or delete indexed roles.
