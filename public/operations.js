@@ -15,6 +15,7 @@
     resetEditor();
     $('schedules').replaceChildren(node('p', 'No private source schedules are displayed while locked.', 'empty'));
     $('scheduler-state').textContent = 'Not checked';
+    $('scheduler-help').textContent = 'Unlock to inspect scheduler configuration and worker activity.';
     $('budget-status').textContent = 'Unlock to inspect live budgets.';
     actionStatus('');
     $('checked').textContent = 'Not checked yet';
