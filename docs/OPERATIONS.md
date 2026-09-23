@@ -14,7 +14,7 @@ After deploying, confirm root page/static assets, `/api/health`, `/api/status`, 
 
 Imports use stable source IDs and atomic indexing. Embedding calls complete before database writes; the same source is serialized with a PostgreSQL advisory transaction lock. Retry failed batches rather than the entire board. A frontend timeout means completion is unknown, not necessarily failed; inspect indexed rows before repeating. Repeating an import is idempotent for its source IDs.
 
-Only complete small-board snapshots close missing rows immediately. Large boards are fetched in bounded batches; their contents can change between requests. Stale rows are excluded after `SOURCE_FRESH_DAYS` (14 by default), and expired/closed rows do not enter retrieval. This is not instantaneous vacancy closure detection. For dependable large-board snapshots, move fetch/normalize/index to a durable queued worker with cursors, a stable snapshot ID and per-source reconciliation. Do not run an unbounded crawler inside a web request. Respect the source's collection and reuse requirements.
+Only complete small-board snapshots close missing rows immediately. Large boards are fetched in bounded batches; their contents can change between requests. Stale rows are excluded after `SOURCE_FRESH_DAYS` (14 by default), and expired/closed rows do not enter retrieval. This is not instantaneous vacancy closure detection. Use the durable `/operations` queue and separate `python -m rolecraft.worker` process for stable snapshots of up to 200 jobs. Larger sources need a new bounded adapter; they fail rather than truncate. See [the import runbook](RELIABLE_IMPORTS.md). Do not run an unbounded crawler inside a web request. Respect the source's collection and reuse requirements.
 
 ## Costs and scale
 
@@ -29,3 +29,7 @@ Exact cosine scoring after SQL filtering is intentional for correctness on modes
 ## Initial source delivery
 
 Initial connector-based publication used a temporary checksum-verified, source-only transport. The release workflow validated 90 backend tests, real PostgreSQL/pgvector contracts, and nine browser scenarios in each of Chromium, Firefox and WebKit before publishing the normal source files at commit `afec1114674979ad7322124b81d6a2c9d8882237`. It used a fast-forward push, never a force-push. The transport bundle and its one-time write-enabled workflow were then removed. Normal development edits source files and uses `.github/workflows/ci.yml`, which has read-only repository permissions. Provider credentials and a verified Vercel deployment are separate from source publication.
+
+## Version 1.1
+
+Apply all numbered migrations with `python scripts/manage.py migrate` before upgrading the web and worker. The new `/api/readiness` endpoint separates configured storage readiness from liveness and paid-provider health. See [durable import operations](RELIABLE_IMPORTS.md) for fencing, cancellation, budgets, snapshot retention and rollback.

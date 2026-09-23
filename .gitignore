@@ -9,3 +9,5 @@ __pycache__/
 *.db
 artifacts/
 test-results/
+
+artifacts/

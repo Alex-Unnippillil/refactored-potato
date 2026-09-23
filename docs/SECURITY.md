@@ -23,3 +23,7 @@ The included Docker database password is a clearly marked disposable local devel
 Demo jobs are fictional. Live jobs and their source links remain in PostgreSQL; browser storage holds saved IDs and search presets, not access tokens. Shortlist exports deliberately include selected job details and source URLs; handle those files as your own saved data. Search URLs can include the user's query text; avoid entering personal documents or credentials.
 
 No independent penetration test or security certification is claimed. Before operating as a public service, add identity-based authorization, tenant isolation, per-user abuse controls, a privacy/retention policy and incident response procedures appropriate to your deployment.
+
+## Durable import controls (1.1)
+
+Queue and cancellation routes require the separate ingestion token. The operations dashboard holds it only in page memory, clears the input immediately, removes private details on lock/navigation, and does not put it in localStorage, URLs or share links. The queue admits canonical board tokens only; callers cannot choose a worker request destination. Run metadata omits snapshots and lease tokens. Database-owned fencing protects cancelled/reclaimed jobs at commit. Empty/invalid/expired snapshots do not reconcile missing rows. A job-attempt budget bounds new paid indexing attempts, not exact provider charges. Keep provider-side spending controls enabled. The container runs as UID 10001 and supports a read-only root filesystem.

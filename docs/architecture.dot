@@ -1,0 +1,50 @@
+digraph Rolecraft {
+  graph [rankdir=TB, bgcolor="#f7f8f3", pad="0.5", nodesep="0.4", ranksep="0.6", splines=polyline, fontname="Helvetica", fontsize=22, fontcolor="#183d2e", labelloc=t, label="ROLECRAFT 1.1  |  Search + reliable ingestion\n "];
+  node [shape=box, style="rounded,filled", color="#bccbb0", fillcolor="white", fontname="Helvetica", fontsize=12, fontcolor="#183d2e", margin="0.22,0.16"];
+  edge [color="#6e875a", arrowsize=0.7, fontname="Helvetica", fontsize=10, fontcolor="#496334"];
+  subgraph cluster_client {
+    label="BROWSER  |  Public UI / private live API access"; fontsize=14; color="#cfdac5"; style=rounded;
+    search [label="Job search workspace\nHard filters + soft preferences\nSaved roles / compare / source evidence"];
+    ops [label="Operations dashboard\nReadiness / recent runs / cancellation\nOperator token: page memory only"];
+  }
+  subgraph cluster_web {
+    label="WEB RUNTIME  |  FastAPI on Vercel or container"; fontsize=14; color="#cfdac5"; style=rounded;
+    api [label="Authenticated search / brief routes\nBounded requests + daily budgets\nNever replace live failures with demo data"];
+    enqueue [label="POST /api/import-runs  →  202\nSeparate ingestion token\nDuplicate active boards coalesce"];
+    ready [label="/api/readiness + /api/operations\nDatabase, schema, fresh corpus checks\nProvider configuration ≠ provider health"];
+  }
+  subgraph cluster_data {
+    label="POSTGRESQL + PGVECTOR  |  Durable state"; fontsize=14; color="#9ebc86"; style="rounded,filled"; fillcolor="#edf3e5";
+    filter [label="Parameterized SQL eligibility\nLocation / pay + currency / work style\nActive + non-expired + fresh records"];
+    fts [label="Full-text retrieval\nPostgreSQL weighted tsquery"];
+    vectors [label="Vector retrieval\nExact cosine AFTER metadata filtering\n1,536-dimensional chunks"];
+    queue [label="import_runs + immutable run snapshot\nCursor / retry time / fenced lease token\nOne active run per board"];
+    corpus [label="jobs + job_chunks + sources\nAtomic batch writes AND cursor checkpoint\nMissing roles close only on final success"];
+  }
+  subgraph cluster_worker {
+    label="SEPARATE WORKER RUNTIME  |  NOT a Vercel background request"; fontsize=14; color="#cfdac5"; style=rounded;
+    worker [label="python -m rolecraft.worker\nSKIP LOCKED claim + 10-minute lease\nFive roles per unit / three failures max"];
+    snapshot [label="Greenhouse public Job Board API\nOne validated snapshot per run\n12 MB response / 200 roles maximum"];
+    embed [label="Chunk + embed\n1,100 characters / 160 overlap\nOpenAI text-embedding-3-small"];
+  }
+  rank [label="Job-level deduplication + weighted RRF\nEvidence ranking / optional Cohere rerank\nExact quotes / optional source-checked brief", fillcolor="#d9ebc4"];
+  demo [label="NO-KEY DEMO PATH\n24 fictional jobs · SQLite / FTS5 · deterministic concept vectors\nNo neural model, live vacancies, paid calls or background worker", fillcolor="#fff5df", color="#d9c7a1"];
+  search -> api [label="workspace token in live mode"];
+  ops -> enqueue [label="operator token"];
+  ops -> ready;
+  api -> filter;
+  corpus -> filter [label="same eligible relation"];
+  filter -> fts;
+  filter -> vectors;
+  fts -> rank;
+  vectors -> rank;
+  enqueue -> queue [label="durable admission; return immediately"];
+  queue -> worker [label="claim / resume"];
+  worker -> snapshot [label="only when no snapshot exists"];
+  snapshot -> queue [label="persist validated snapshot"];
+  worker -> embed [label="next saved batch"];
+  embed -> corpus [label="lease checked inside transaction"];
+  corpus -> queue [label="atomic progress; retry-safe"];
+  ready -> queue [style=dashed, label="sanitized metadata only"];
+  api -> demo [style=dashed, label="DATABASE_URL absent only"];
+}

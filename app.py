@@ -18,7 +18,7 @@ from rolecraft.search import search
 from rolecraft.store import PostgresStore, get_store
 
 ROOT = Path(__file__).resolve().parent
-app = FastAPI(title='Rolecraft Hybrid Job Search', version='1.0.0', docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title='Rolecraft Hybrid Job Search', version='1.1.0', docs_url=None, redoc_url=None, openapi_url=None)
 logger = logging.getLogger('rolecraft')
 
 CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; base-uri 'self'"
@@ -45,6 +45,8 @@ async def guardrails(request: Request, call_next):
 def authorize(request: Request, admin: bool = False):
     configured = os.getenv('INGEST_TOKEN' if admin else 'APP_ACCESS_TOKEN', '')
     live = bool(os.getenv('DATABASE_URL'))
+    if admin and live and configured and configured == os.getenv('APP_ACCESS_TOKEN'):
+        raise HTTPException(503, 'Workspace and ingestion tokens must be different.')
     if admin or live or configured:
         if len(configured) < 32:
             raise HTTPException(503, 'This private workspace needs a server-side access token of at least 32 characters.')
@@ -96,7 +98,7 @@ def icon():
 
 @app.get('/api/health')
 def health():
-    return {'status':'ok','service':'rolecraft','version':'1.0.0'}
+    return {'status':'ok','service':'rolecraft','version':'1.1.0'}
 
 
 @app.get('/api/status')
@@ -189,3 +191,7 @@ def ingest(payload: IngestRequest, request: Request):
             'next_offset':payload.offset + payload.limit if payload.provider == 'greenhouse' and payload.offset + payload.limit < total else None,
             'complete_snapshot':complete,'note':'Unknown fields remain unknown. Large boards require all batches; stale records age out after the freshness window.'}
     return safe_operation(run)
+
+
+from rolecraft.operations import router as operations_router
+app.include_router(operations_router(authorize, safe_operation))

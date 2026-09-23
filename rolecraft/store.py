@@ -83,7 +83,7 @@ class PostgresStore:
     def connect(self):
         import psycopg
         from psycopg.rows import dict_row
-        return psycopg.connect(os.environ['DATABASE_URL'], connect_timeout=8, row_factory=dict_row, options='-c statement_timeout=12000')
+        return psycopg.connect(os.environ['DATABASE_URL'], connect_timeout=8, row_factory=dict_row, options='-c statement_timeout=12000 -c lock_timeout=5000 -c timezone=UTC')
 
     def retrieve(self, query: str, filters: Filters, semantic: bool = True) -> dict:
         from .providers import EMBEDDING_MODEL, embed
@@ -131,7 +131,7 @@ class PostgresStore:
                 WHERE usage_buckets.used < %s RETURNING used''', (kind, cap)).fetchone()
         return row is not None
 
-    def upsert_jobs(self, jobs: list[Job], source_key: str, source_label: str, complete: bool) -> int:
+    def upsert_jobs(self, jobs: list[Job], source_key: str, source_label: str, complete: bool, *, transaction_hook=None) -> int:
         from .providers import EMBEDDING_MODEL, embed
         # Network calls happen before transaction: failed embeddings never leave
         # partially indexed jobs. A bounded ingestion request accepts <= 10 jobs.
@@ -153,6 +153,12 @@ class PostgresStore:
             # Serialize syncs of the same source; a failed request rolls back all
             # writes, including deletion of old chunks and source bookkeeping.
             connection.execute('SELECT pg_advisory_xact_lock(hashtext(%s))', (source_key,))
+            if transaction_hook:
+                transaction_hook(connection)
+            elif connection.execute("SELECT to_regclass('import_runs') AS t").fetchone()['t']:
+                active = connection.execute("SELECT 1 FROM import_runs WHERE 'greenhouse:' || board=%s AND state IN ('queued','running','retry')", (source_key,)).fetchone()
+                if active:
+                    raise ValueError('A durable import owns this source. Finish or cancel it before a direct import.')
             connection.execute('INSERT INTO sources (key, label, last_synced) VALUES (%s,%s,now()) ON CONFLICT (key) DO UPDATE SET label=EXCLUDED.label,last_synced=now()', (source_key, source_label))
             for job, chunks, vectors in prepared:
                 payload = job.model_dump()

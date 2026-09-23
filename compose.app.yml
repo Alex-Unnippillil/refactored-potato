@@ -1,0 +1,32 @@
+services:
+  web:
+    build: .
+    ports: ["127.0.0.1:8000:8000"]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-}
+      APP_ACCESS_TOKEN: ${APP_ACCESS_TOKEN:-}
+      INGEST_TOKEN: ${INGEST_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      COHERE_API_KEY: ${COHERE_API_KEY:-}
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
+      SCRAPE_ALLOWED_HOSTS: ${SCRAPE_ALLOWED_HOSTS:-}
+      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-}
+  worker:
+    profiles: [live]
+    build: .
+    command: [python, -m, rolecraft.worker]
+    healthcheck:
+      disable: true
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DAILY_IMPORT_JOB_LIMIT: ${DAILY_IMPORT_JOB_LIMIT:-200}
+    restart: unless-stopped

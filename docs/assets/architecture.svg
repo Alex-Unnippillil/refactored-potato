@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1160" viewBox="0 0 1440 1160" role="img" aria-labelledby="title desc">
+<title id="title">Rolecraft: hybrid search and durable ingestion</title><desc id="desc">Two separate paths: SQL-filtered hybrid retrieval, and a database-backed Greenhouse import worker with fenced atomic progress. Demo data remains isolated.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8" fill="#6c8751"/></marker></defs>
+<rect width="1440" height="1160" fill="#f7f8f3"/>
+<g font-family="Arial, Helvetica, sans-serif" fill="#183d2e">
+<text x="48" y="58" font-size="14" font-weight="700" fill="#5e7a47">ROLECRAFT 1.1</text>
+<text x="48" y="103" font-size="32" font-weight="700" fill="#183d2e">Hybrid search. Durable imports. Visible operations.</text>
+<text x="48" y="134" font-size="16" font-weight="400" fill="#52634d">The database owns durable state. The web server never pretends an in-process task is a persistent worker.</text>
+<rect x="28" y="168" width="1384" height="222" rx="14" fill="#edf3e5" stroke="#c6d5ba"/>
+<text x="48" y="197" font-size="12" font-weight="700" fill="#183d2e">SEARCH PATH  /  Browser → authenticated FastAPI → the same SQL-eligible records</text>
+<rect x="48" y="219" width="300" height="137" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
+<text x="68" y="245" font-size="11" font-weight="700" fill="#5e7a47">01 / REQUEST</text>
+<text x="68" y="273" font-size="18" font-weight="700" fill="#183d2e">What matters to you</text>
+<text x="68" y="299" font-size="13" font-weight="400" fill="#52634d">Natural-language relevance</text>
+<text x="68" y="320" font-size="13" font-weight="400" fill="#52634d">Explicit location / salary / work style</text>
+<text x="68" y="341" font-size="13" font-weight="400" fill="#52634d">Workspace token in live mode</text>
+<rect x="396" y="219" width="300" height="137" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
+<text x="416" y="245" font-size="11" font-weight="700" fill="#5e7a47">02 / CONSTRAIN</text>
+<text x="416" y="273" font-size="18" font-weight="700" fill="#183d2e">SQL hard filters</text>
+<text x="416" y="299" font-size="13" font-weight="400" fill="#52634d">Parameterized values only</text>
+<text x="416" y="320" font-size="13" font-weight="400" fill="#52634d">Active + fresh + non-expired jobs</text>
+<text x="416" y="341" font-size="13" font-weight="400" fill="#52634d">Unknown pay does not pass a floor</text>
+<rect x="744" y="219" width="300" height="137" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
+<text x="764" y="245" font-size="11" font-weight="700" fill="#5e7a47">03 / RETRIEVE</text>
+<text x="764" y="273" font-size="18" font-weight="700" fill="#183d2e">Words + meaning</text>
+<text x="764" y="299" font-size="13" font-weight="400" fill="#52634d">PostgreSQL full-text retrieval</text>
+<text x="764" y="320" font-size="13" font-weight="400" fill="#52634d">pgvector exact cosine on chunks</text>
+<text x="764" y="341" font-size="13" font-weight="400" fill="#52634d">Both branches obey the filters</text>
+<rect x="1092" y="219" width="300" height="137" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
+<text x="1112" y="245" font-size="11" font-weight="700" fill="#5e7a47">04 / EXPLAIN</text>
+<text x="1112" y="273" font-size="18" font-weight="700" fill="#183d2e">Fuse, rank, cite</text>
+<text x="1112" y="299" font-size="13" font-weight="400" fill="#52634d">Job-level deduplication + RRF</text>
+<text x="1112" y="320" font-size="13" font-weight="400" fill="#52634d">Optional Cohere re-ranking</text>
+<text x="1112" y="341" font-size="13" font-weight="400" fill="#52634d">Verified excerpts; no culture scores</text>
+<path d="M349 288 L391 288" fill="none" stroke="#6c8751" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M697 288 L739 288" fill="none" stroke="#6c8751" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M1045 288 L1087 288" fill="none" stroke="#6c8751" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="28" y="415" width="1384" height="458" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
+<text x="48" y="448" font-size="12" font-weight="700" fill="#183d2e">INGESTION PATH  /  Operator API + PostgreSQL queue + a SEPARATE worker runtime</text>
+<rect x="48" y="475" width="300" height="137" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
+<text x="68" y="501" font-size="11" font-weight="700" fill="#5e7a47">01 / OPERATOR</text>
+<text x="68" y="529" font-size="18" font-weight="700" fill="#183d2e">Queue an allowed board</text>
+<text x="68" y="555" font-size="13" font-weight="400" fill="#52634d">Separate ingestion token</text>
+<text x="68" y="576" font-size="13" font-weight="400" fill="#52634d">202 = admitted, not completed</text>
+<text x="68" y="597" font-size="13" font-weight="400" fill="#52634d">One active run per board</text>
+<rect x="396" y="475" width="300" height="137" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
+<text x="416" y="501" font-size="11" font-weight="700" fill="#5e7a47">02 / PERSIST</text>
+<text x="416" y="529" font-size="18" font-weight="700" fill="#183d2e">PostgreSQL import queue</text>
+<text x="416" y="555" font-size="13" font-weight="400" fill="#52634d">Run state + progress + retry time</text>
+<text x="416" y="576" font-size="13" font-weight="400" fill="#52634d">Admission and job-attempt budgets</text>
+<text x="416" y="597" font-size="13" font-weight="400" fill="#52634d">Survives web / worker restarts</text>
+<rect x="744" y="475" width="300" height="137" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
+<text x="764" y="501" font-size="11" font-weight="700" fill="#5e7a47">03 / CLAIM</text>
+<text x="764" y="529" font-size="18" font-weight="700" fill="#183d2e">Independent worker</text>
+<text x="764" y="555" font-size="13" font-weight="400" fill="#52634d">SKIP LOCKED across boards</text>
+<text x="764" y="576" font-size="13" font-weight="400" fill="#52634d">10-minute lease + fencing token</text>
+<text x="764" y="597" font-size="13" font-weight="400" fill="#52634d">No long-running Vercel request</text>
+<rect x="1092" y="475" width="300" height="137" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
+<text x="1112" y="501" font-size="11" font-weight="700" fill="#5e7a47">04 / CAPTURE</text>
+<text x="1112" y="529" font-size="18" font-weight="700" fill="#183d2e">One source snapshot</text>
+<text x="1112" y="555" font-size="13" font-weight="400" fill="#52634d">Greenhouse public Job Board API</text>
+<text x="1112" y="576" font-size="13" font-weight="400" fill="#52634d">Validate all records before indexing</text>
+<text x="1112" y="597" font-size="13" font-weight="400" fill="#52634d">12 MB / 200-role safety bounds</text>
+<path d="M349 544 L391 544" fill="none" stroke="#6c8751" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M697 544 L739 544" fill="none" stroke="#6c8751" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M1045 544 L1087 544" fill="none" stroke="#6c8751" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M1242 613 L1242 674" fill="none" stroke="#6c8751" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="1089" y="651" font-size="12" font-weight="400" fill="#52634d">Persist normalized snapshot once</text>
+<rect x="1092" y="684" width="300" height="137" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
+<text x="1112" y="710" font-size="11" font-weight="700" fill="#5e7a47">05 / RESUME</text>
+<text x="1112" y="738" font-size="18" font-weight="700" fill="#183d2e">Read the saved snapshot</text>
+<text x="1112" y="764" font-size="13" font-weight="400" fill="#52634d">Stable IDs; no shifting offsets</text>
+<text x="1112" y="785" font-size="13" font-weight="400" fill="#52634d">At most five jobs per work unit</text>
+<text x="1112" y="806" font-size="13" font-weight="400" fill="#52634d">Reject empty / expired snapshots</text>
+<rect x="744" y="684" width="300" height="137" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
+<text x="764" y="710" font-size="11" font-weight="700" fill="#5e7a47">06 / EMBED</text>
+<text x="764" y="738" font-size="18" font-weight="700" fill="#183d2e">Chunk the next batch</text>
+<text x="764" y="764" font-size="13" font-weight="400" fill="#52634d">1,100 characters / 160 overlap</text>
+<text x="764" y="785" font-size="13" font-weight="400" fill="#52634d">OpenAI 1,536-dimensional vectors</text>
+<text x="764" y="806" font-size="13" font-weight="400" fill="#52634d">Network calls before transaction</text>
+<rect x="396" y="684" width="300" height="137" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
+<text x="416" y="710" font-size="11" font-weight="700" fill="#5e7a47">07 / COMMIT</text>
+<text x="416" y="738" font-size="18" font-weight="700" fill="#183d2e">Fence + atomic checkpoint</text>
+<text x="416" y="764" font-size="13" font-weight="400" fill="#52634d">Check current lease and cursor</text>
+<text x="416" y="785" font-size="13" font-weight="400" fill="#52634d">Write jobs, vectors AND progress</text>
+<text x="416" y="806" font-size="13" font-weight="400" fill="#52634d">Rollback leaves no cursor ahead</text>
+<rect x="48" y="684" width="300" height="137" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
+<text x="68" y="710" font-size="11" font-weight="700" fill="#5e7a47">08 / FINISH OR RESUME</text>
+<text x="68" y="738" font-size="18" font-weight="700" fill="#183d2e">Safe reconciliation</text>
+<text x="68" y="764" font-size="13" font-weight="400" fill="#52634d">More rows: requeue same snapshot</text>
+<text x="68" y="785" font-size="13" font-weight="400" fill="#52634d">Final success: close missing roles</text>
+<text x="68" y="806" font-size="13" font-weight="400" fill="#52634d">Cancel / failure: keep prior batches</text>
+<path d="M1090 752 L1049 752" fill="none" stroke="#6c8751" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M742 752 L701 752" fill="none" stroke="#6c8751" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M394 752 L353 752" fill="none" stroke="#6c8751" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="48" y="850" font-size="13" font-weight="400" fill="#52634d">Retries resume saved progress. Stale or cancelled workers cannot commit. Provider billing is at-least-once, not exactly-once.</text>
+<rect x="48" y="900" width="640" height="110" rx="14" fill="#edf3e5" stroke="#c6d5ba"/>
+<text x="69" y="931" font-size="12" font-weight="700" fill="#5e7a47">DURABLE DATA</text>
+<text x="69" y="957" font-size="17" font-weight="700" fill="#183d2e">jobs + job_chunks + sources + import_runs</text>
+<text x="69" y="985" font-size="13" font-weight="400" fill="#52634d">Full-text / vectors / provenance / cursor / heartbeat / daily budgets</text>
+<rect x="710" y="900" width="682" height="110" rx="14" fill="#edf3e5" stroke="#c6d5ba"/>
+<text x="731" y="931" font-size="12" font-weight="700" fill="#5e7a47">OPERATIONS &amp; TRUST BOUNDARY</text>
+<text x="731" y="957" font-size="17" font-weight="700" fill="#183d2e">/operations  ·  /api/readiness  ·  /api/health</text>
+<text x="731" y="985" font-size="13" font-weight="400" fill="#52634d">Real database checks. Credential presence is NOT provider health.</text>
+<rect x="48" y="1035" width="1344" height="90" rx="14" fill="#fff4dc" stroke="#d8c69f"/>
+<text x="69" y="1065" font-size="12" font-weight="700" fill="#7b652e">ISOLATED, NO-KEY DEMO — DATABASE_URL ABSENT</text>
+<text x="69" y="1096" font-size="15" font-weight="400" fill="#6a5b38">24 fictional roles · SQLite + FTS5 · deterministic concept vectors · no neural model, paid provider, live vacancies or worker</text>
+</g></svg>
