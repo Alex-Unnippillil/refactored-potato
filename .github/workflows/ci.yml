@@ -37,9 +37,10 @@ jobs:
       - name: Validate Python, API and PostgreSQL contracts
         run: |
           python -m compileall -q app.py rolecraft scripts
-          python -m pytest tests/test_core.py tests/test_api.py tests/test_providers.py tests/test_postgres.py -q
+          python -m pytest tests --ignore=tests/test_ui.py -q
           python scripts/evaluate.py
           node --check public/app.js
+          node --check public/operations.js
       - name: Install browser engines
         run: python -m playwright install --with-deps chromium firefox webkit
       - name: Verify HTTP application in Chromium, Firefox and WebKit
@@ -58,6 +59,33 @@ jobs:
           for browser in chromium firefox webkit; do
             RUN_UI_TESTS=1 TEST_BROWSER="$browser" python -m pytest tests/test_ui.py -q || exit 1
           done
+      - name: Capture actual HTTP screenshots
+        run: python scripts/capture_screenshots.py --output artifacts/screenshots
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: rolecraft-screenshots
+          path: artifacts/screenshots
+      - name: Build and verify the non-root container
+        run: |
+          docker build -t rolecraft:ci .
+          docker run -d --name rolecraft-smoke --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true -p 127.0.0.1:8001:8000 rolecraft:ci
+          python - <<'PYTHON'
+          import time, httpx
+          for attempt in range(40):
+              try:
+                  r=httpx.get('http://127.0.0.1:8001/api/readiness')
+                  assert r.status_code==200 and r.json()['mode']=='demo'
+                  break
+              except Exception:
+                  if attempt==39: raise
+                  time.sleep(1)
+          assert httpx.get('http://127.0.0.1:8001/operations').status_code==200
+          r=httpx.post('http://127.0.0.1:8001/api/search',json={'query':'python'})
+          assert r.status_code==200 and r.json()['jobs']
+          PYTHON
+          test "$(docker exec rolecraft-smoke id -u)" = 10001
+          docker rm -f rolecraft-smoke
       - name: Include sanitized server log on failure
         if: failure()
         run: test ! -f /tmp/rolecraft-server.log || tail -n 100 /tmp/rolecraft-server.log
