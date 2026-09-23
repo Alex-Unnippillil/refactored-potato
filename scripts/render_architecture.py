@@ -3,10 +3,10 @@ from html import escape
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-parts = ['''<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1160" viewBox="0 0 1440 1160" role="img" aria-labelledby="title desc">
+parts = ['''<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1390" viewBox="0 0 1440 1390" role="img" aria-labelledby="title desc">
 <title id="title">Rolecraft: hybrid search and durable ingestion</title><desc id="desc">Two separate paths: SQL-filtered hybrid retrieval, and a database-backed Greenhouse import worker with fenced atomic progress. Demo data remains isolated.</desc>
 <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8" fill="#6c8751"/></marker></defs>
-<rect width="1440" height="1160" fill="#f7f8f3"/>
+<rect width="1440" height="1390" fill="#f7f8f3"/>
 <g font-family="Arial, Helvetica, sans-serif" fill="#183d2e">''']
 
 
@@ -29,8 +29,8 @@ def arrow(x1,y1,x2,y2):
     parts.append(f'<path d="M{x1} {y1} L{x2} {y2}" fill="none" stroke="#6c8751" stroke-width="2" marker-end="url(#arrow)"/>')
 
 
-text(48,58,'ROLECRAFT 1.1',14,True,'#5e7a47')
-text(48,103,'Hybrid search. Durable imports. Visible operations.',32,True)
+text(48,58,'ROLECRAFT 1.2',14,True,'#5e7a47')
+text(48,103,'Hybrid search. Scheduled refreshes. Visible operations.',32,True)
 text(48,134,'The database owns durable state. The web server never pretends an in-process task is a persistent worker.',16,False,'#52634d')
 rect(28,168,1384,222,'#edf3e5')
 text(48,197,'SEARCH PATH  /  Browser → authenticated FastAPI → the same SQL-eligible records',12,True)
@@ -56,14 +56,21 @@ box(x[0],684,'08 / FINISH OR RESUME','Safe reconciliation',['More rows: requeue 
 for a,b in zip(list(reversed(x)),list(reversed(x))[1:]):arrow(a-2,752,b+305,752)
 text(48,850,'Retries resume saved progress. Stale or cancelled workers cannot commit. Provider billing is at-least-once, not exactly-once.',13,False,'#52634d')
 rect(48,900,640,110,'#edf3e5');text(69,931,'DURABLE DATA',12,True,'#5e7a47')
-text(69,957,'jobs + job_chunks + sources + import_runs',17,True)
+text(69,957,'jobs + chunks + sources + runs + schedules',17,True)
 text(69,985,'Full-text / vectors / provenance / cursor / heartbeat / daily budgets',13,False,'#52634d')
 rect(710,900,682,110,'#edf3e5');text(731,931,'OPERATIONS & TRUST BOUNDARY',12,True,'#5e7a47')
 text(731,957,'/operations  ·  /api/readiness  ·  /api/health',17,True)
 text(731,985,'Real database checks. Credential presence is NOT provider health.',13,False,'#52634d')
-rect(48,1035,1344,90,'#fff4dc','#d8c69f')
-text(69,1065,'ISOLATED, NO-KEY DEMO — DATABASE_URL ABSENT',12,True,'#7b652e')
-text(69,1096,'24 fictional roles · SQLite + FTS5 · deterministic concept vectors · no neural model, paid provider, live vacancies or worker',15,False,'#6a5b38')
+rect(28,1035,1384,206,'#ffffff')
+text(48,1066,'RECURRING REFRESH  /  Opt-in dispatch feeds the SAME durable import queue above',12,True)
+box(x[0],1090,'01 / CONFIGURE','Source schedules',['Paused by default; 6–168 hours','20 sources; revision-checked edits','Pause/remove preserve jobs + runs'])
+box(x[1],1090,'02 / OPT IN','Separate worker tick',['Explicit worker environment flag','Due PostgreSQL rows; database clock','No missed-interval replay'])
+box(x[2],1090,'03 / ADMIT ATOMICALLY','Shared queue + budgets',['One active run per board','Run + next deadline commit together','Full/busy cooldown; UTC quota reset'])
+box(x[3],1090,'04 / OBSERVE','Source freshness',['Same predicates as job retrieval','No simulated counts or heartbeats','Provider health is not inferred'])
+for a,b in zip(x,x[1:]):arrow(a+301,1158,b-5,1158)
+rect(48,1265,1344,90,'#fff4dc','#d8c69f')
+text(69,1295,'ISOLATED, NO-KEY DEMO — DATABASE_URL ABSENT',12,True,'#7b652e')
+text(69,1326,'24 fictional roles · SQLite + FTS5 · deterministic concept vectors · no neural model, paid provider, live vacancies or worker',15,False,'#6a5b38')
 parts.append('</g></svg>')
 (ROOT/'docs/assets').mkdir(parents=True,exist_ok=True)
 (ROOT/'docs/assets/architecture.svg').write_text('\n'.join(parts)+'\n')

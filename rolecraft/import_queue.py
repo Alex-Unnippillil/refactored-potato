@@ -50,21 +50,26 @@ class ImportQueue:
     def enqueue(self, board: str) -> tuple[dict, bool]:
         board = board_token(board)
         with self.store.connect() as conn:
-            # Consistent source/admission locking also excludes legacy syncs.
-            conn.execute('SELECT pg_advisory_xact_lock(hashtext(%s))', ('greenhouse:' + board,))
-            conn.execute("SELECT pg_advisory_xact_lock(hashtext('rolecraft:queue-admission'))")
-            existing = conn.execute("SELECT * FROM import_runs WHERE board=%s AND state IN ('queued','running','retry')", (board,)).fetchone()
-            if existing:
-                return public_run(existing), False
-            active = conn.execute("SELECT count(*) AS n FROM import_runs WHERE state IN ('queued','running','retry')").fetchone()['n']
-            if active >= 20:
-                raise QueueConflict('The import queue is full. Finish or cancel an existing run first.')
-            admitted = conn.execute("""INSERT INTO usage_buckets(day,kind,used) VALUES(CURRENT_DATE,'queue_requests',1)
-                ON CONFLICT(day,kind) DO UPDATE SET used=usage_buckets.used+1
-                WHERE usage_buckets.used < 10 RETURNING used""").fetchone()
-            if not admitted:
-                raise QueueBudget('The daily limit of 10 new import runs has been reached.')
-            row = conn.execute('INSERT INTO import_runs(id,board) VALUES(%s,%s) RETURNING *', (str(uuid4()), board)).fetchone()
+            return self.enqueue_in_transaction(conn, board)
+
+    def enqueue_in_transaction(self, conn, board: str) -> tuple[dict, bool]:
+        """Admit within the caller transaction using a canonical board token."""
+        board = board_token(board)
+        # Consistent source/admission locking also excludes legacy syncs.
+        conn.execute('SELECT pg_advisory_xact_lock(hashtext(%s))', ('greenhouse:' + board,))
+        conn.execute("SELECT pg_advisory_xact_lock(hashtext('rolecraft:queue-admission'))")
+        existing = conn.execute("SELECT * FROM import_runs WHERE board=%s AND state IN ('queued','running','retry')", (board,)).fetchone()
+        if existing:
+            return public_run(existing), False
+        active = conn.execute("SELECT count(*) AS n FROM import_runs WHERE state IN ('queued','running','retry')").fetchone()['n']
+        if active >= 20:
+            raise QueueConflict('The import queue is full. Finish or cancel an existing run first.')
+        admitted = conn.execute("""INSERT INTO usage_buckets(day,kind,used) VALUES(CURRENT_DATE,'queue_requests',1)
+            ON CONFLICT(day,kind) DO UPDATE SET used=usage_buckets.used+1
+            WHERE usage_buckets.used < 10 RETURNING used""").fetchone()
+        if not admitted:
+            raise QueueBudget('The daily limit of 10 new import runs has been reached.')
+        row = conn.execute('INSERT INTO import_runs(id,board) VALUES(%s,%s) RETURNING *', (str(uuid4()), board)).fetchone()
         return public_run(row), True
 
     def recent(self) -> list[dict]:

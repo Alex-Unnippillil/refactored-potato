@@ -24,6 +24,21 @@ def main() -> int:
     query = commands.add_parser('search', help='Run a local demo or configured live query')
     query.add_argument('query')
     query.add_argument('--country', default='')
+    schedules = commands.add_parser('schedules', help='Manage recurring source refreshes with direct operator database access')
+    actions = schedules.add_subparsers(dest='schedule_action', required=True)
+    actions.add_parser('list', help='Show saved schedules, freshness and budgets')
+    add = actions.add_parser('add', help='Save a paused source; never starts collection')
+    add.add_argument('board')
+    add.add_argument('--hours', type=int, default=24)
+    update = actions.add_parser('update', help='Update interval and paused/enabled state with a revision check')
+    update.add_argument('board')
+    update.add_argument('--hours', type=int, required=True)
+    update.add_argument('--state', choices=('paused', 'enabled'), required=True)
+    update.add_argument('--revision', type=int, required=True)
+    for name in ('run', 'remove'):
+        action = actions.add_parser(name, help='Queue one import' if name == 'run' else 'Remove only the schedule, not jobs or runs')
+        action.add_argument('board')
+        action.add_argument('--revision', type=int, required=True)
     args = parser.parse_args()
     try:
         if args.command == 'migrate':
@@ -34,6 +49,26 @@ def main() -> int:
                 for migration in sorted((ROOT / 'sql').glob('[0-9][0-9][0-9]_*.sql')):
                     conn.execute(migration.read_text())
             print('Schema applied. No jobs were imported.')
+        elif args.command == 'schedules':
+            if not os.getenv('DATABASE_URL'):
+                raise ValueError('Schedules require a live DATABASE_URL. The demo is read-only.')
+            from rolecraft.schedules import SourceSchedules
+            manager = SourceSchedules()
+            if args.schedule_action == 'list':
+                result = manager.overview()
+            elif args.schedule_action == 'add':
+                result = manager.create(args.board, args.hours, False)
+            elif args.schedule_action == 'update':
+                result = manager.update(args.board, args.hours, args.state == 'enabled', args.revision)
+            elif args.schedule_action == 'run':
+                if not os.getenv('OPENAI_API_KEY'):
+                    raise ValueError('Configure embedding credentials and the separate worker before importing.')
+                run, created = manager.run_now(args.board, args.revision)
+                result = {'run': run, 'created': created}
+            else:
+                manager.remove(args.board, args.revision)
+                result = {'removed': True, 'notice': 'Indexed jobs and admitted runs were preserved.'}
+            print(json.dumps(result, default=str, indent=2))
         elif args.command == 'status':
             from rolecraft.store import get_store
             store = get_store()

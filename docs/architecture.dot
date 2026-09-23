@@ -1,11 +1,11 @@
 digraph Rolecraft {
-  graph [rankdir=TB, bgcolor="#f7f8f3", pad="0.5", nodesep="0.4", ranksep="0.6", splines=polyline, fontname="Helvetica", fontsize=22, fontcolor="#183d2e", labelloc=t, label="ROLECRAFT 1.1  |  Search + reliable ingestion\n "];
+  graph [rankdir=TB, bgcolor="#f7f8f3", pad="0.5", nodesep="0.4", ranksep="0.6", splines=polyline, fontname="Helvetica", fontsize=22, fontcolor="#183d2e", labelloc=t, label="ROLECRAFT 1.2  |  Search + reliable ingestion\n "];
   node [shape=box, style="rounded,filled", color="#bccbb0", fillcolor="white", fontname="Helvetica", fontsize=12, fontcolor="#183d2e", margin="0.22,0.16"];
   edge [color="#6e875a", arrowsize=0.7, fontname="Helvetica", fontsize=10, fontcolor="#496334"];
   subgraph cluster_client {
     label="BROWSER  |  Public UI / private live API access"; fontsize=14; color="#cfdac5"; style=rounded;
     search [label="Job search workspace\nHard filters + soft preferences\nSaved roles / compare / source evidence"];
-    ops [label="Operations dashboard\nReadiness / recent runs / cancellation\nOperator token: page memory only"];
+    ops [label="Operations dashboard\nReadiness / schedules / source freshness\nOperator token: page memory only"];
   }
   subgraph cluster_web {
     label="WEB RUNTIME  |  FastAPI on Vercel or container"; fontsize=14; color="#cfdac5"; style=rounded;
@@ -19,6 +19,7 @@ digraph Rolecraft {
     fts [label="Full-text retrieval\nPostgreSQL weighted tsquery"];
     vectors [label="Vector retrieval\nExact cosine AFTER metadata filtering\n1,536-dimensional chunks"];
     queue [label="import_runs + immutable run snapshot\nCursor / retry time / fenced lease token\nOne active run per board"];
+    schedules [label="source_schedules\nPaused by default / 6–168 hours\nRevision checks / due time / linked run"];
     corpus [label="jobs + job_chunks + sources\nAtomic batch writes AND cursor checkpoint\nMissing roles close only on final success"];
   }
   subgraph cluster_worker {
@@ -32,6 +33,8 @@ digraph Rolecraft {
   search -> api [label="workspace token in live mode"];
   ops -> enqueue [label="operator token"];
   ops -> ready;
+  ops -> schedules [label="operator-only configuration"];
+  schedules -> queue [label="opted-in worker: atomic admission + deadline"];
   api -> filter;
   corpus -> filter [label="same eligible relation"];
   filter -> fts;
