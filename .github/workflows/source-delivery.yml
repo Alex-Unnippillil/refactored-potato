@@ -38,7 +38,13 @@ jobs:
           import base64, hashlib, json, lzma
           from pathlib import Path
           manifest = json.loads(Path('.delivery/source.json').read_text())
-          archive = base64.b64decode(manifest['payload'], validate=True)
+          assert 1 <= len(manifest['parts']) <= 30
+          pieces = []
+          for i, checksum in enumerate(manifest['parts']):
+              piece = Path(f'.delivery/source-{i:02}.b64').read_text().strip()
+              assert hashlib.sha256(piece.encode()).hexdigest() == checksum, f'Transport checksum mismatch: part {i}'
+              pieces.append(piece)
+          archive = base64.b64decode(''.join(pieces), validate=True)
           assert hashlib.sha256(archive).hexdigest() == manifest['sha256'], 'Archive checksum mismatch'
           files = json.loads(lzma.decompress(archive, memlimit=134217728))
           assert isinstance(files, dict) and 10 <= len(files) <= 100
@@ -81,7 +87,7 @@ jobs:
           done
       - name: Publish only after all checks pass
         run: |
-          rm .delivery/source.json
+          rm .delivery/source.json .delivery/source-*.b64
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
