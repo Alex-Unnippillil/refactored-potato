@@ -169,7 +169,7 @@ vercel deploy --prod
 
 Vercel hosts the web app, **not the persistent import worker**. Run the worker in a container/VM or other approved process runtime connected to the same database. No paid resource is provisioned automatically. A deployment URL and real-provider smoke test must be verified separately; repository CI is not a claim that a hosted production instance exists.
 
-Do not treat a successful `/api/health` response as database/provider readiness. `/api/readiness` checks the configured store and corpus without calling paid providers. That endpoint is liveness only. In live mode, run an authenticated search, inspect evidence and source freshness, and verify the expected commit in Vercel's deployment details. See [operations](docs/OPERATIONS.md) and [security](docs/SECURITY.md).
+Do not treat a successful `/api/health` response as database/provider readiness. `/api/readiness` checks the configured store and corpus without calling paid providers. In live mode, run an authenticated search, inspect evidence and source freshness, and verify the expected commit in Vercel's deployment details. See [operations](docs/OPERATIONS.md) and [security](docs/SECURITY.md).
 
 ## Tests and evaluation
 
