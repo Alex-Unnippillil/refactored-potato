@@ -2,7 +2,7 @@ name: Verified source delivery
 on:
   push:
     branches: [main]
-    paths: ['.delivery/source.json']
+    paths: ['.delivery/source.json', '.delivery/patches.json', '.github/workflows/source-delivery.yml']
   workflow_dispatch:
 permissions:
   contents: write
@@ -49,6 +49,12 @@ jobs:
           files = json.loads(lzma.decompress(archive, memlimit=134217728))
           assert isinstance(files, dict) and 10 <= len(files) <= 100
           assert sum(len(v) for v in files.values()) < 2000000
+          patches = json.loads(Path('.delivery/patches.json').read_text())
+          assert len(patches) <= 20
+          for patch in patches:
+              assert patch['path'] in files
+              assert files[patch['path']].count(patch['before']) == 1, 'Patch precondition mismatch'
+              files[patch['path']] = files[patch['path']].replace(patch['before'], patch['after'])
           for name, text in files.items():
               path = Path(name)
               assert isinstance(text, str) and not path.is_absolute() and '..' not in path.parts
@@ -57,7 +63,7 @@ jobs:
               assert not path.is_symlink()
               path.parent.mkdir(parents=True, exist_ok=True)
               path.write_text(text, encoding='utf-8')
-          print(f'Verified {len(files)} source files; no credentials or workflows unpacked.')
+          print(f'Verified {len(files)} source files and {len(patches)} reviewed patches; no credentials or workflows unpacked.')
           PY
       - name: Install pinned dependencies
         run: python -m pip install -r requirements-dev.txt
@@ -87,10 +93,13 @@ jobs:
           done
       - name: Publish only after all checks pass
         run: |
-          rm .delivery/source.json .delivery/source-*.b64
+          rm .delivery/source.json .delivery/patches.json .delivery/source-*.b64
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git commit -m 'feat: ship Rolecraft hybrid RAG job-search workspace'
           git push origin HEAD:main
           echo "Published verified source commit $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Include local application log on failure
+        if: failure()
+        run: test ! -f /tmp/rolecraft-server.log || tail -n 100 /tmp/rolecraft-server.log
