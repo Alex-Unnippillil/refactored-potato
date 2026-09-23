@@ -168,3 +168,53 @@ def test_mobile_layout_and_touch_controls(page):
     page.locator('.main-nav [data-view="saved"]').click()
     expect(page.locator('#view-saved')).to_be_visible()
     assert not page.evaluate('document.documentElement.scrollWidth > innerWidth')
+
+
+def test_operations_dashboard_demo_state(page):
+    page.locator('.sidebar-bottom a[href="/operations"]').click()
+    expect(page.locator('#metric-jobs')).to_have_text('24')
+    expect(page.locator('#metric-worker')).to_have_text('Off')
+    expect(page.locator('#checks li')).to_have_count(3)
+    expect(page.locator('#queue-button')).to_be_disabled()
+    expect(page.locator('#runs')).to_contain_text('not simulated activity')
+    assert not page.evaluate('document.documentElement.scrollWidth > innerWidth')
+
+
+def test_operations_token_clear_and_refresh(page):
+    page.goto(os.getenv('TEST_BASE_URL', 'http://127.0.0.1:8000') + '/operations', wait_until='networkidle')
+    page.locator('#operator-token').fill('operator-token-must-not-persist')
+    page.locator('#unlock').click()
+    expect(page.locator('#operator-token')).to_have_value('')
+    expect(page.locator('#metric-jobs')).to_have_text('24')
+    assert 'operator-token-must-not-persist' not in page.evaluate('JSON.stringify(localStorage)')
+    page.locator('#lock').click()
+    expect(page.locator('#metric-jobs')).to_have_text('—')
+    expect(page.locator('#queue-button')).to_be_disabled()
+    expect(page.locator('#runs')).to_contain_text('while locked')
+    page.locator('#refresh').click()
+    expect(page.locator('#metric-jobs')).to_have_text('24')
+
+
+def test_operations_mobile_navigation_and_controls(page):
+    page.set_viewport_size({'width':390,'height':844})
+    page.locator('.main-nav [data-view="sources"]').click()
+    page.locator('#view-sources a[href="/operations"]').click()
+    expect(page.locator('#metric-jobs')).to_have_text('24')
+    assert not page.evaluate('document.documentElement.scrollWidth > innerWidth')
+    assert page.locator('#refresh').bounding_box()['height'] >= 44
+    page.locator('#auto-refresh').check()
+    expect(page.locator('#auto-refresh')).to_be_checked()
+    page.locator('#auto-refresh').uncheck()
+    page.locator('nav a[href="/"]').click()
+    expect(page.locator('#results .job-card')).to_have_count(12)
+
+
+def test_operations_narrow_layout_and_keyboard(page):
+    page.goto(os.getenv('TEST_BASE_URL', 'http://127.0.0.1:8000') + '/operations', wait_until='networkidle')
+    page.set_viewport_size({'width':320,'height':740})
+    expect(page.locator('#metric-jobs')).to_have_text('24')
+    assert not page.evaluate('document.documentElement.scrollWidth > innerWidth')
+    page.locator('#refresh').focus()
+    page.keyboard.press('Enter')
+    expect(page.locator('#refresh')).to_be_enabled()
+    expect(page.locator('#metric-jobs')).to_have_text('24')

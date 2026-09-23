@@ -31,7 +31,8 @@ def main() -> int:
                 raise ValueError('Set DATABASE_URL in your environment first.')
             import psycopg
             with psycopg.connect(os.environ['DATABASE_URL'], autocommit=True, connect_timeout=10) as conn:
-                conn.execute((ROOT / 'sql/001_init.sql').read_text())
+                for migration in sorted((ROOT / 'sql').glob('[0-9][0-9][0-9]_*.sql')):
+                    conn.execute(migration.read_text())
             print('Schema applied. No jobs were imported.')
         elif args.command == 'status':
             from rolecraft.store import get_store
