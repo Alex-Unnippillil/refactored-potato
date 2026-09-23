@@ -1,0 +1,125 @@
+name: Verify Rolecraft release candidate
+on:
+  push:
+    branches: [feat/reliable-imports-operations]
+    paths: ['.delivery/manifest.json']
+permissions:
+  contents: write
+concurrency:
+  group: rolecraft-release-candidate
+  cancel-in-progress: false
+jobs:
+  verify-and-publish:
+    if: github.ref == 'refs/heads/feat/reliable-imports-operations'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rolecraft_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d rolecraft_test"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/rolecraft_test
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify and apply source-only release patch
+        run: |
+          python - <<'PY'
+          import base64, hashlib, json, lzma, subprocess
+          from pathlib import Path
+          manifest=json.loads(Path('.delivery/manifest.json').read_text())
+          assert 1 <= len(manifest['parts']) <= 12
+          parts=[]
+          for i,checksum in enumerate(manifest['parts']):
+              piece=Path(f'.delivery/patch-{i:02}.b64').read_text().strip()
+              assert hashlib.sha256(piece.encode()).hexdigest()==checksum, f'Part {i} checksum mismatch'
+              parts.append(piece)
+          blob=base64.b64decode(''.join(parts),validate=True)
+          assert hashlib.sha256(blob).hexdigest()==manifest['sha256']
+          patch=lzma.decompress(blob,memlimit=134217728)
+          assert len(patch)<1000000 and len(manifest['files'])<=80
+          for name in manifest['files']:
+              path=Path(name)
+              assert not path.is_absolute() and '..' not in path.parts and not path.is_symlink()
+              assert path.parts[0] not in ('.git','.github','.vercel','.delivery')
+              assert not path.name.startswith('.env') or path.name=='.env.example'
+          listed=subprocess.check_output(['git','apply','--numstat','-'],input=patch).decode().splitlines()
+          assert {line.split('\t',2)[2] for line in listed}==set(manifest['files'])
+          subprocess.run(['git','apply','--check','-'],input=patch,check=True)
+          subprocess.run(['git','apply','-'],input=patch,check=True)
+          for name,checksum in manifest['files'].items():
+              assert hashlib.sha256(Path(name).read_bytes()).hexdigest()==checksum,name
+          print(f'Applied {len(manifest["files"])} checksum-verified source files. No secrets or workflow paths.')
+          PY
+      - name: Install pinned dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Validate Python, API, PostgreSQL recovery and retrieval
+        run: |
+          python -m compileall -q app.py rolecraft scripts
+          python -m pytest tests --ignore=tests/test_ui.py -q
+          python scripts/evaluate.py
+          node --check public/app.js
+          node --check public/operations.js
+      - name: Install browser engines
+        run: python -m playwright install --with-deps chromium firefox webkit
+      - name: Verify real HTTP application in three browsers
+        run: |
+          python -m uvicorn app:app --host 127.0.0.1 --port 8000 > /tmp/rolecraft-server.log 2>&1 &
+          python - <<'PY'
+          import time,urllib.request
+          for i in range(30):
+              try:
+                  urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=2)
+                  break
+              except Exception:
+                  if i==29: raise
+                  time.sleep(1)
+          PY
+          for browser in chromium firefox webkit; do
+            RUN_UI_TESTS=1 TEST_BROWSER="$browser" python -m pytest tests/test_ui.py -q || exit 1
+          done
+      - name: Capture actual HTTP screenshots for README
+        run: |
+          python scripts/capture_screenshots.py
+          python scripts/render_architecture.py
+      - name: Build and smoke-test non-root read-only container
+        run: |
+          docker build -t rolecraft:release .
+          docker run -d --name rolecraft-smoke --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true -p 127.0.0.1:8001:8000 rolecraft:release
+          python - <<'PY'
+          import time,httpx
+          for i in range(40):
+              try:
+                  r=httpx.get('http://127.0.0.1:8001/api/readiness')
+                  assert r.status_code==200 and r.json()['mode']=='demo'
+                  break
+              except Exception:
+                  if i==39: raise
+                  time.sleep(1)
+          assert httpx.get('http://127.0.0.1:8001/operations').status_code==200
+          r=httpx.post('http://127.0.0.1:8001/api/search',json={'query':'python'})
+          assert r.status_code==200 and r.json()['jobs']
+          PY
+          test "$(docker exec rolecraft-smoke id -u)" = 10001
+          docker rm -f rolecraft-smoke
+      - name: Publish verified source and screenshots to feature branch
+        run: |
+          rm -rf .delivery
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: durable imports, operations dashboard and verified release screenshots'
+          git push origin HEAD:feat/reliable-imports-operations
+          echo "Verified feature commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Include server log on failure
+        if: failure()
+        run: test ! -f /tmp/rolecraft-server.log || tail -n 100 /tmp/rolecraft-server.log
