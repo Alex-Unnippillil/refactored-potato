@@ -1,0 +1,40 @@
+{
+  "sha256": "2dfd1c9529ee32d3c99292207c3c1da8c207b0a24145687749504a7c8b0931c7",
+  "parts": [
+    "76a95a9664c12fdf97d58b797de1b08093a704b8af14b73c0f2ba298993b6a28",
+    "99067c3b4fc180749113cec7f9e5477cbefc82aecf77bf8b8e41e0cd0277666c",
+    "e3a7b2bfb592e6f75d63d97249a874c64011beca64e8d517ca1f2b2f61cf3a8f",
+    "2ef8975b10e38c14104b491b1c725a2ff716941bdda5508d49c2b6ac161a4cd3",
+    "1c570d0599e1a47b56d0273aad9ef92ccc2d02925e907e6a5d3c2095947bbeda",
+    "a2dc93221ce5462cc8fd28085ac6f4cf8b3d068f7dd1f91ed11105393f080392"
+  ],
+  "files": {
+    ".dockerignore": "848178def02ecb06acdf63a2a1944b1a73390316d17704d2efdd1b3133141d68",
+    ".env.example": "fe45a333fbf18617136e546b18887f810506df45ed3fe0c0db57cb626c436912",
+    ".gitignore": "10ee6887cf4261752db3b21f41d61fd4158c261b81b7ec63fe2ea41e6616d74e",
+    "Dockerfile": "1d31e5a68626f35037ac11de2ae6181692aeb65492a828047e6a1cb5f0fb4c04",
+    "README.md": "7c8a1f6fa0eaff99945be0b8e58c228485895a2da7b64dad83f861f441d365d9",
+    "app.py": "029e152932d1ccf8f1073ecd092289373138a13868d25d51fbf7cbf756a19f65",
+    "compose.app.yml": "149f1eae2fb20e569b87dd0e4190660c507356f403c97af84a39356e2f6a8d56",
+    "docs/OPERATIONS.md": "5379087a86bc061c8098d4a2bbff4c2afd90a46e6f308039f7726ec3fc648b69",
+    "docs/RELIABLE_IMPORTS.md": "01f32ae19e2845a2948639a288e25222dfb6a9337b1c4ca9710722f8eac992fe",
+    "docs/SECURITY.md": "690b098d3e5bf93328879b8dfd0fc7400ea6e3096449fd50ffaa4cab385c989a",
+    "docs/architecture.dot": "e24ec03aa68b107d556ba5590c04fbd0ffa519d9baba097c2bed3ba58e7170a0",
+    "docs/assets/architecture.svg": "ff77c72763d832135e96c1b037eb14eefc3ea93957749b63a0fc38f5fca6e3a0",
+    "public/index.html": "c0603fef1b75885223bd9390fdd4bb17da0822b6626b7be882e10aae4f300af4",
+    "public/operations.css": "1d322e6017eef9005ec2e2dc41d8ed2a1fb1748db7a0ca036e186167dc9df550",
+    "public/operations.html": "10026af86816c730d093177bd6d972d849f3cdafc50fc65f04494801b50c1867",
+    "public/operations.js": "57255eb564b69cf01807412f69b71332d1d9a0269ce6873403f1d572157eee33",
+    "rolecraft/import_queue.py": "baf5fa0d1039c11d93b7285c8a3a3b55901c35c1af61e8c0920802e66bd885e0",
+    "rolecraft/operations.py": "1b9a0a7d58a416961d4f85b5cc3b0b63503362474b0d3f25697cebdf300408d3",
+    "rolecraft/store.py": "d8de9a97c3c24fbb6b34decc2b80fbc87e21d76b0532aadf15c4dbfc3ddc8208",
+    "rolecraft/worker.py": "7c52100e76946a5bce85b8342b7ceaca5a996b27afd93197b64efb07dd1afba5",
+    "scripts/capture_screenshots.py": "ad6172d90e7025716f4aab3551f497e5a5c88fe6053b6e45ccd19a520a241804",
+    "scripts/manage.py": "c71cf632f101dcc2dc1ae37252c54d509a58896422d87f1a47ac4ad483f53dd0",
+    "scripts/render_architecture.py": "ead8d5d959e96e02a7a4bf41ed1972a71c876136ffa344b694ecd0e7a53f6bc7",
+    "sql/002_imports.sql": "309379021dabc03cceabdaec96b47a1804dd48d74e925449b8c2d86102cb2685",
+    "tests/test_import_queue.py": "3b77f92b58947ed035f7132e09432ab1f7731808af67b5cfc2cee3ec909e969d",
+    "tests/test_operations.py": "9f41b4d0bcde4cd903eadf51c117d0abc23987678fcdb285b4974ac951aef3bd",
+    "tests/test_ui.py": "a26d44cc0c49c5f6cff2a8d400aba7e254db2118f686fa9e74b2b61c7d77c970"
+  }
+}
