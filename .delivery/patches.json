@@ -1,7 +1,0 @@
-[
-  {
-    "path": "tests/test_postgres.py",
-    "before": "    result = search(SearchRequest(query='engineer', filters=Filters(country='Canada', work_mode='Remote', min_salary=140000), page_size=24), store)\n    assert result['jobs'] and result['trace']['semantic_candidates'] > 0\n",
-    "after": "    # The deterministic test embedder has no broad learned meaning for the lone\n    # token 'engineer'. Use an in-ontology term to exercise vector retrieval above\n    # the unchanged production similarity floor, alongside lexical retrieval.\n    request = SearchRequest(query='python engineer', filters=Filters(country='Canada', work_mode='Remote', min_salary=140000), page_size=24)\n    raw = store.retrieve(request.query, request.filters)\n    eligible_ids = {'demo-01', 'demo-04', 'demo-08'}\n    assert raw['lexical'] and raw['semantic']\n    assert {identifier for identifier, _ in raw['lexical']} <= eligible_ids\n    assert {identifier for identifier, _ in raw['semantic']} <= eligible_ids\n    result = search(request, store)\n    assert result['jobs'] and result['trace']['semantic_candidates'] > 0\n    assert result['trace']['lexical_candidates'] > 0\n"
-  }
-]
