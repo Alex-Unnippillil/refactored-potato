@@ -9,7 +9,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   verify:
-    if: github.ref == 'refs/heads/feat/search-reliability-1-3' && (github.event.head_commit.message == 'release: verify search reliability candidate' || startsWith(github.event.head_commit.message, 'candidate:'))
+    if: >-
+      github.ref == 'refs/heads/feat/search-reliability-1-3' && (github.event.head_commit.message == 'release: verify search reliability candidate' || startsWith(github.event.head_commit.message, 'candidate:'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
