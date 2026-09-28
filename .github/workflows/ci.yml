@@ -39,7 +39,7 @@ jobs:
       - name: Validate Python, API and PostgreSQL contracts
         run: |
           python -m compileall -q app.py rolecraft scripts
-          python -m pytest tests --ignore=tests/test_ui.py --ignore=tests/test_schedules_ui.py -q
+          python -m pytest tests --ignore=tests/test_ui.py --ignore=tests/test_schedules_ui.py --ignore=tests/test_reliability_ui.py -q
           python scripts/evaluate.py
           node --check public/app.js
           node --check public/operations.js
@@ -59,7 +59,7 @@ jobs:
                   time.sleep(1)
           PY
           for browser in chromium firefox webkit; do
-            RUN_UI_TESTS=1 TEST_BROWSER="$browser" python -m pytest tests/test_ui.py tests/test_schedules_ui.py -q || exit 1
+            RUN_UI_TESTS=1 TEST_BROWSER="$browser" python -m pytest tests/test_ui.py tests/test_schedules_ui.py tests/test_reliability_ui.py -q || exit 1
           done
       - name: Capture actual HTTP screenshots
         run: python scripts/capture_screenshots.py --output artifacts/screenshots
@@ -68,6 +68,7 @@ jobs:
         with:
           name: rolecraft-screenshots
           path: artifacts/screenshots
+          if-no-files-found: error
       - name: Build and verify the non-root container
         run: |
           docker build -t rolecraft:ci .

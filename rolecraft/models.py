@@ -27,6 +27,7 @@ class SearchRequest(BaseModel):
     query: str = Field(default='', max_length=600)
     filters: Filters = Field(default_factory=Filters)
     preferences: list[Literal['async', 'balance', 'ownership', 'mentorship', 'mission', 'learning']] = Field(default_factory=list, max_length=6)
+    allow_keyword_fallback: bool = True
     semantic_weight: float = Field(default=0.65, ge=0, le=1)
     page: int = Field(default=1, ge=1, le=100)
     page_size: int = Field(default=12, ge=1, le=24)

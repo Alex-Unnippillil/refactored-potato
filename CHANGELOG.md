@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.0 — 2026-09-28 — search reliability and source evidence
+
+- Add a selected-preference source audit with supporting/conflicting/mixed/uncertain/not-found states, exact Unicode spans and transparent branch ranks. Replace broad positive culture cues with conservative explicit wording and bounded negation/hedging.
+- Distinguish recoverable timeouts/network interruptions from invalid URLs, client protocol errors and malformed response encodings. Invalid contracts fail immediately, without retries or keyword fallback, and public errors omit provider details.
+- Allow only transient embedding outages to trigger a visibly labelled hybrid-to-keyword fallback with the original filters. Explicit meaning-only and strict API requests fail instead; provider/schema/database errors remain errors.
+- Keep eligible counts, retrieval and job payloads in one repeatable-read, read-only PostgreSQL snapshot. Exclude stale/expired live jobs from saved lookups and export.
+- Reject malformed embedding/rerank indices, non-finite/boolean values and near-zero vectors. Preserve degradation and conflict caveats in evidence briefs.
+- Add local workspace locking, request-epoch fencing and cleared private caches on token replacement; retain explicitly saved device-local presets by design.
+- Extend unit, real PostgreSQL concurrency and three-browser HTTP coverage. Update the architecture, runbook and eight reproducible demo screenshots. No new schema migration or external service is provisioned.
+
+
 ## 1.2.0 — 2026-09-23
 
 ### Added

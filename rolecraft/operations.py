@@ -11,13 +11,14 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from . import __version__
 from .import_queue import ImportQueue, QueueBudget, QueueConflict, board_token
 from .schedules import SourceSchedules, ScheduleMissing
 from .models import Filters
 from .providers import EMBEDDING_MODEL
 from .store import get_store, where_clause
 
-VERSION = '1.2.0'
+VERSION = __version__
 ROOT = Path(__file__).resolve().parents[1]
 
 

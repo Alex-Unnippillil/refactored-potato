@@ -95,6 +95,9 @@ class PostgresStore:
         # HNSW is supplied for future larger-scale, measured ANN deployments.
         prefix = f'WITH eligible AS MATERIALIZED (SELECT * FROM jobs WHERE {condition}) '
         with self.connect() as connection:
+            # One snapshot for counts, both rankings, and returned payloads.
+            # Provider calls above never hold a database transaction open.
+            connection.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY')
             total = connection.execute(f'SELECT count(*) AS n FROM jobs WHERE {condition}', args).fetchone()['n']
             if not query:
                 rows = connection.execute(f'SELECT payload FROM jobs WHERE {condition} ORDER BY last_seen DESC, id LIMIT 100', args).fetchall()
@@ -118,8 +121,11 @@ class PostgresStore:
         return dict(row)
 
     def find(self, ids: list[str]) -> list[dict]:
+        condition, args = where_clause(Filters(), True)
         with self.connect() as connection:
-            return [r['payload'] for r in connection.execute('SELECT payload FROM jobs WHERE id = ANY(%s) AND active', (ids,)).fetchall()]
+            return [r['payload'] for r in connection.execute(
+                f'SELECT payload FROM jobs WHERE id = ANY(%s) AND {condition} ORDER BY id',
+                [ids, *args]).fetchall()]
 
     def consume_budget(self, kind: str = 'search') -> bool:
         cap = max(1, min(int(os.getenv('DAILY_SEARCH_LIMIT', '250')), 10000))

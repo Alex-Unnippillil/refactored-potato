@@ -29,16 +29,16 @@ def arrow(x1,y1,x2,y2):
     parts.append(f'<path d="M{x1} {y1} L{x2} {y2}" fill="none" stroke="#6c8751" stroke-width="2" marker-end="url(#arrow)"/>')
 
 
-text(48,58,'ROLECRAFT 1.2',14,True,'#5e7a47')
-text(48,103,'Hybrid search. Scheduled refreshes. Visible operations.',32,True)
-text(48,134,'The database owns durable state. The web server never pretends an in-process task is a persistent worker.',16,False,'#52634d')
+text(48,58,'ROLECRAFT 1.3',14,True,'#5e7a47')
+text(48,103,'Hybrid search. Explicit fallback. Source evidence.',32,True)
+text(48,134,'Read snapshots protect search integrity while the separate worker refreshes sources. No invented culture guarantees.',16,False,'#52634d')
 rect(28,168,1384,222,'#edf3e5')
 text(48,197,'SEARCH PATH  /  Browser → authenticated FastAPI → the same SQL-eligible records',12,True)
 x=[48,396,744,1092]
 box(x[0],219,'01 / REQUEST','What matters to you',['Natural-language relevance','Explicit location / salary / work style','Workspace token in live mode'])
-box(x[1],219,'02 / CONSTRAIN','SQL hard filters',['Parameterized values only','Active + fresh + non-expired jobs','Unknown pay does not pass a floor'])
-box(x[2],219,'03 / RETRIEVE','Words + meaning',['PostgreSQL full-text retrieval','pgvector exact cosine on chunks','Both branches obey the filters'])
-box(x[3],219,'04 / EXPLAIN','Fuse, rank, cite',['Job-level deduplication + RRF','Optional Cohere re-ranking','Verified excerpts; no culture scores'])
+box(x[1],219,'02 / CONSTRAIN','SQL hard filters',['One repeatable-read snapshot','Active + fresh + non-expired jobs','Unknown pay does not pass a floor'])
+box(x[2],219,'03 / RETRIEVE','Words + meaning',['PostgreSQL full-text retrieval','pgvector exact cosine on chunks','Transient outage: keyword fallback'])
+box(x[3],219,'04 / EXPLAIN','Fuse, rank, cite',['Job-level deduplication + RRF','Optional Cohere re-ranking','Support / conflict / uncertainty'])
 for a,b in zip(x,x[1:]):arrow(a+301,288,b-5,288)
 rect(28,415,1384,458,'#ffffff')
 text(48,448,'INGESTION PATH  /  Operator API + PostgreSQL queue + a SEPARATE worker runtime',12,True)

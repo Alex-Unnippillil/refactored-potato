@@ -115,3 +115,71 @@ def test_request_budget_is_persistent_and_bounded(pg, monkeypatch):
     assert store.consume_budget('brief') is True
     with store.connect() as conn:
         assert conn.execute("SELECT used FROM usage_buckets WHERE kind='search'").fetchone()['used'] == 2
+
+
+def test_saved_lookup_uses_search_freshness_rules(pg):
+    store, rows = pg
+    with store.connect() as connection:
+        connection.execute("UPDATE jobs SET last_seen=now()-interval '31 days' WHERE id=%s", (rows[0].id,))
+        connection.execute("UPDATE jobs SET expires_at=now()-interval '1 day' WHERE id=%s", (rows[1].id,))
+    assert not {rows[0].id, rows[1].id} & {j['id'] for j in store.find([j.id for j in rows])}
+
+
+def test_payload_and_both_retrievers_share_a_snapshot_during_refresh(pg, monkeypatch):
+    store, rows = pg
+    original_connect = store.connect
+    changed = []
+    class ConcurrentRefresh:
+        def __init__(self):
+            self.connection = original_connect()
+        def __enter__(self):
+            self.connection.__enter__()
+            return self
+        def __exit__(self, *args):
+            return self.connection.__exit__(*args)
+        def execute(self, query, params=None):
+            cursor = self.connection.execute(query, params)
+            # Commit a different country after candidates are ranked but before
+            # their payloads are fetched. This used to mix two database versions.
+            if 'GROUP BY e.id ORDER BY' in query and not changed:
+                with original_connect() as writer:
+                    writer.execute("UPDATE jobs SET country='Germany', payload=jsonb_set(payload,'{country}','\"Germany\"') WHERE id=%s", (rows[0].id,))
+                changed.append(True)
+            return cursor
+    monkeypatch.setattr(store, 'connect', ConcurrentRefresh)
+    result = store.retrieve('python', Filters(country='Canada'))
+    assert changed
+    assert rows[0].id in {j['id'] for j in result['jobs']}
+    assert all(j['country'] == 'Canada' for j in result['jobs'])
+    with original_connect() as connection:
+        assert connection.execute('SELECT country FROM jobs WHERE id=%s', (rows[0].id,)).fetchone()['country'] == 'Germany'
+
+
+def test_real_postgres_outage_fallback_remains_filtered(pg, monkeypatch):
+    from rolecraft.providers import ProviderUnavailable
+    store, _ = pg
+    def outage(_):
+        raise ProviderUnavailable('Temporary transport failure.')
+    monkeypatch.setattr('rolecraft.providers.embed', outage)
+    result = search(SearchRequest(query='python', filters=Filters(country='Canada', min_salary=140000)), store)
+    assert result['jobs'] and result['retrieval_status'] == 'keyword_fallback'
+    assert all(j['country'] == 'Canada' and j['salary_min'] >= 140000 for j in result['jobs'])
+
+
+def test_fallback_spends_one_search_budget(pg, monkeypatch):
+    from fastapi.testclient import TestClient
+    from rolecraft.providers import ProviderUnavailable
+    import app
+    store, _ = pg
+    monkeypatch.setenv('APP_ACCESS_TOKEN', 'test-workspace-' + 'x' * 32)
+    monkeypatch.setenv('DAILY_SEARCH_LIMIT', '1')
+    def outage(_):
+        raise ProviderUnavailable('Temporary transport failure.')
+    monkeypatch.setattr('rolecraft.providers.embed', outage)
+    client = TestClient(app.app)
+    headers = {'Authorization': 'Bearer ' + os.environ['APP_ACCESS_TOKEN']}
+    first = client.post('/api/search', json={'query': 'python'}, headers=headers)
+    assert first.status_code == 200 and first.json()['retrieval_status'] == 'keyword_fallback'
+    assert client.post('/api/search', json={'query': 'python'}, headers=headers).status_code == 429
+    with store.connect() as connection:
+        assert connection.execute("SELECT used FROM usage_buckets WHERE kind='search'").fetchone()['used'] == 1

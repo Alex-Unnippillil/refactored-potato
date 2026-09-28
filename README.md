@@ -4,9 +4,9 @@
 
 ![CI](https://github.com/Alex-Unnippillil/refactored-potato/actions/workflows/ci.yml/badge.svg)
 
-**Release 1.2 — opt-in scheduled sources, freshness diagnostics, and concurrency-safe operator controls.**
+**Release 1.3 — explicit search fallback, source-evidence audits, consistent reads, and private-workspace locking.**
 
-[Run locally](#run-the-demo) · [Live workspace](#live-workspace) · [Scheduled sources](docs/SCHEDULED_SOURCES.md) · [Durable imports](docs/RELIABLE_IMPORTS.md) · [Operations](docs/OPERATIONS.md) · [Security](docs/SECURITY.md)
+[Search reliability](docs/SEARCH_RELIABILITY.md) · [Run locally](#run-the-demo) · [Live workspace](#live-workspace) · [Scheduled sources](docs/SCHEDULED_SOURCES.md) · [Durable imports](docs/RELIABLE_IMPORTS.md) · [Operations](docs/OPERATIONS.md) · [Security](docs/SECURITY.md)
 
 Rolecraft is a complete job-search workspace built around a hybrid retrieval pipeline: structured SQL constraints, full-text search, description vectors, reciprocal-rank fusion, re-ranking, and source-backed evidence briefs. A responsive interface makes the pipeline useful rather than hiding it behind a chat box.
 
@@ -14,10 +14,13 @@ Rolecraft is a complete job-search workspace built around a hybrid retrieval pip
 
 ## The working application
 
-The screenshots below are captured from the **running HTTP demo**, not design mockups. Demo data is fictional and the import worker is correctly shown as off. CI regenerates screenshots as downloadable artifacts; `python scripts/capture_screenshots.py` refreshes the committed images during development.
+The eight screenshots below are captured from the **running HTTP demo**, not design mockups. Demo data is fictional and the import worker is correctly shown as off. CI regenerates screenshots as downloadable artifacts; `python scripts/capture_screenshots.py` refreshes the committed images during development.
 
 ### Search workspace — desktop
 ![Rolecraft desktop: explicit filters, natural-language query, saved roles and evidence-backed results](docs/assets/workspace-desktop.png)
+
+### Source evidence — inspect what the listing actually says
+![Rolecraft source audit: selected preferences, supporting or conflicting wording, exact excerpts and branch ranks](docs/assets/evidence-desktop.png)
 
 ### Operations — desktop
 ![Rolecraft operations: actual demo counts, readiness checks, disabled live import control and honest empty run history](docs/assets/operations-desktop.png)
@@ -29,6 +32,7 @@ The screenshots below are captured from the **running HTTP demo**, not design mo
 <details>
 <summary>Mobile screenshots — 390-pixel viewport, captured at 2× resolution</summary>
 
+<img src="docs/assets/evidence-mobile.png" width="390" alt="Selected-preference source audit and retrieval explanation on mobile">
 <img src="docs/assets/workspace-mobile.png" width="390" alt="Rolecraft job search on a narrow mobile viewport">
 <img src="docs/assets/operations-mobile.png" width="390" alt="Rolecraft operational readiness on a narrow mobile viewport">
 
@@ -46,7 +50,9 @@ The web process handles bounded requests. PostgreSQL owns the durable import sta
 
 - Natural-language relevance search alongside explicit country, city, work style, experience, annual base salary and currency filters. SQL applies the filters before **both** retrieval branches.
 - Six optional preferences: asynchronous work, sustainable pace, ownership, mentorship, meaningful work and learning. Keywords-only, meaning-only and hybrid views make retrieval behavior inspectable.
-- Exact evidence excerpts, unconfirmed preferences, raw retrieval diagnostics and an evidence brief. No invented match percentages or promises about company culture.
+- Selected-preference source audits with supporting, conflicting, mixed, uncertain and unstated evidence; exact source spans and per-branch ranks. Briefs retain conflicts and retrieval warnings. No invented match percentages or culture guarantees.
+- Explicit keyword fallback during transient embedding outages in hybrid mode only, with unchanged hard filters and a persistent notice. Meaning-only and strict API requests never silently degrade.
+- Per-request repeatable-read SQL snapshots; saved-role lookup uses the same freshness/expiry rules. Private-workspace locking clears in-memory payloads and rejects late responses from old access sessions.
 - Saved roles and searches, up-to-three-role comparison, shortlist export, shareable search URLs, keyboard shortcuts, touch-friendly navigation, and mobile filters.
 - Live PostgreSQL/pgvector storage, Greenhouse board imports, an allowlisted Firecrawl adapter, and validated JSON imports. Optional Cohere re-ranking and OpenAI excerpt selection.
 - A durable Greenhouse import queue: one persisted snapshot, restartable five-job units, fenced leases, cancellation, bounded retries, job-attempt budgets and closure only on complete success.
@@ -108,7 +114,7 @@ On PowerShell, use `$env:DATABASE_URL = '...'` instead of `export`. Environment 
 | `IMPORT_SCHEDULER_ENABLED` | Worker opt-in (`true` or `1`); default off. Saved schedules must also be enabled. Set consistently on web and worker for diagnostics. |
 | `SOURCE_FRESH_DAYS` | Exclude live records not refreshed within this many days; default 14, bounded 1–90. |
 
-Generate different access tokens locally using a trusted password manager or `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Store them in your deployment secret manager, not this repository or a chat message. The web client keeps access tokens only in page memory. This is a **single private workspace**, not a multi-tenant account/SSO system.
+Generate different access tokens locally using a trusted password manager or `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Store them in your deployment secret manager, not this repository or a chat message. The web client keeps access tokens only in page memory. **Lock workspace** clears private in-memory results and rejects obsolete responses; it does not revoke the server token or erase explicitly saved search presets. This is a **single private workspace**, not a multi-tenant account/SSO system.
 
 ### 3. Start the separate durable worker
 
@@ -160,6 +166,8 @@ Request → parameterized SQL metadata filters → eligible jobs
               ranked roles + exact excerpts + verified evidence brief
 ```
 
+Source-cue assessments use conservative English lexical rules, not a culture classifier. Only explicitly selected preferences are assessed; free-text preferences remain relevance terms. Inspect conflicting or uncertain text before shortlisting. [Contracts, failure cases and acceptance checks](docs/SEARCH_RELIABILITY.md).
+
 Demo mode uses real SQLite SQL and FTS5 plus deterministic, hand-built 256-dimensional concept vectors. It demonstrates data flow without downloading model weights. It has limited vocabulary, hash collisions, and no learned multilingual understanding. It must not be benchmarked as a neural system.
 
 Live mode uses weighted PostgreSQL full-text retrieval and OpenAI 1,536-dimensional embeddings. The default vector query scores the **exact metadata-filtered relation** to avoid approximate-index filtering surprises. An HNSW index is supplied in the schema, but the default query deliberately does not claim ANN acceleration. Each branch is capped at 100 candidates; browse is also capped at 100. The UI exposes the candidate cap, eligible count, ranking method and timings. For larger corpora, measure recall/latency before changing to filtered ANN, iterative scans, partitioning or an external vector service.
@@ -189,7 +197,7 @@ Do not treat a successful `/api/health` response as database/provider readiness.
 
 ```sh
 python -m pip install -r requirements-dev.txt
-python -m pytest tests --ignore=tests/test_ui.py --ignore=tests/test_schedules_ui.py -q
+python -m pytest tests --ignore=tests/test_ui.py --ignore=tests/test_schedules_ui.py --ignore=tests/test_reliability_ui.py -q
 python scripts/evaluate.py
 node --check public/app.js
 ```
@@ -200,9 +208,9 @@ For actual browser/HTTP tests, start the app at port 8000, then:
 
 ```sh
 python -m playwright install --with-deps chromium firefox webkit
-RUN_UI_TESTS=1 TEST_BROWSER=chromium python -m pytest tests/test_ui.py tests/test_schedules_ui.py -q
-RUN_UI_TESTS=1 TEST_BROWSER=firefox python -m pytest tests/test_ui.py tests/test_schedules_ui.py -q
-RUN_UI_TESTS=1 TEST_BROWSER=webkit python -m pytest tests/test_ui.py tests/test_schedules_ui.py -q
+RUN_UI_TESTS=1 TEST_BROWSER=chromium python -m pytest tests/test_ui.py tests/test_schedules_ui.py tests/test_reliability_ui.py -q
+RUN_UI_TESTS=1 TEST_BROWSER=firefox python -m pytest tests/test_ui.py tests/test_schedules_ui.py tests/test_reliability_ui.py -q
+RUN_UI_TESTS=1 TEST_BROWSER=webkit python -m pytest tests/test_ui.py tests/test_schedules_ui.py tests/test_reliability_ui.py -q
 ```
 
 On Windows, set the two variables with `$env:RUN_UI_TESTS='1'` and `$env:TEST_BROWSER='chromium'` before invoking pytest. CI provisions a real pgvector database and uses normal HTTP for demo and authenticated operations navigation. Private scheduling tests advance a real worker with synthetic upstream/embedding fixtures; one privacy race deliberately delays a real HTTP response. They do not use a fake database or replace API response data. An optional `UI_TEST_MODE=bridge` harness supports restricted offline sandboxes; its network/history/storage substitutions **do not constitute deployment, CSP, browser persistence or network verification**.
@@ -215,7 +223,8 @@ The evaluator reports MRR and nDCG@10 over eight authored queries against the fi
 app.py                    HTTP routes, private access, budgets and headers
 rolecraft/models.py       Validated input and job contracts
 rolecraft/store.py        SQLite demo and PostgreSQL retrieval/atomic indexing
-rolecraft/text.py         Chunking, demo vectors, exact evidence spans
+rolecraft/text.py         Chunking and demo vectors
+rolecraft/signals.py      Versioned conservative source cues and exact evidence spans
 rolecraft/search.py       Fusion, re-ranking, pagination and traces
 rolecraft/providers.py    Bounded OpenAI/Cohere provider calls
 rolecraft/ingest.py        Greenhouse and allowlisted Firecrawl adapters
@@ -238,7 +247,7 @@ tests/                   API, security, retrieval, database and browser tests
 
 ## Limits and next scaling steps
 
-This release does not include recurring collection beyond the opt-in Greenhouse queue, application submission, resume ingestion, employer verification, account synchronization, per-user permissions, a managed worker hosting service, or a pretrained offline embedding model. No provider account or paid database is provisioned by the source code. Source freshness is bounded, not real-time. Authored culture signals are lexical evidence cues and do not robustly understand negation, sarcasm or workplace truth; confirm them with an employer.
+This release does not include recurring collection beyond the opt-in Greenhouse queue, application submission, resume ingestion, employer verification, account synchronization, per-user permissions, a managed worker hosting service, or a pretrained offline embedding model. No provider account or paid database is provisioned by the source code. Source freshness is bounded, not real-time. Source-cue rules recognize selected explicit wording and bounded nearby negation/hedging, but do not robustly understand complex context, attribution, sarcasm, multilingual text or workplace truth; confirm benefits with an employer.
 
 For a public multi-user service, replace the shared token with an audited identity provider and tenant-scoped authorization, add per-user quotas/rate controls, operate the included durable import queue and opt-in source scheduler, run a real labelled retrieval evaluation, and add monitoring/backups. Keep operator imports private. Review source terms, robots policies and licensing before collection; the app does not bypass access controls.
 
@@ -254,7 +263,11 @@ For a public multi-user service, replace the shared token with an audited identi
 
 ## Release verification
 
-The CI workflow runs every backend test against a disposable pgvector database, checks JavaScript syntax, tests normal HTTP navigation in Chromium/Firefox/WebKit, captures six screenshots, and builds/runs the non-root Docker image. Live providers are mocked at their boundaries; these tests do not prove real provider credentials or paid quotas are available. See [the durable-import runbook](docs/RELIABLE_IMPORTS.md) before enabling live collection.
+The CI workflow runs every backend test against a disposable pgvector database, checks JavaScript syntax, tests normal HTTP navigation in Chromium/Firefox/WebKit, captures eight screenshots, and builds/runs the non-root Docker image. Live providers are mocked at their boundaries; these tests do not prove real provider credentials or paid quotas are available. See [the durable-import runbook](docs/RELIABLE_IMPORTS.md) before enabling live collection.
 
 
 A passing CI run also publishes a **tracked-source ZIP** (`rolecraft-source`) and the current screenshot artifact. The source bundle excludes local environment files, untracked files and Git credentials; it is not a standalone installer and still needs the documented runtime dependencies. [Changelog](CHANGELOG.md).
+
+### Version 1.3 upgrade
+
+No new database schema is required beyond migrations 001–003. API additions are documented in [Search reliability](docs/SEARCH_RELIABILITY.md). Strict clients can send `allow_keyword_fallback: false`; the UI always labels transient hybrid fallback. Live saved lookups now exclude stale/expired roles. A green CI run is not a claim of a hosted production deployment or a successful paid-provider acceptance test.

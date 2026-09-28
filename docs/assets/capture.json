@@ -2,6 +2,6 @@
   "mode": "fictional demo",
   "transport": "real HTTP; no browser mocks",
   "device_scale_factor": 2,
-  "source_sha256": "5f1b070fc85a93e1ee7717288788cf64538dba6c79be5bc14f7d8ab75a851cce",
-  "images": 6
+  "source_sha256": "2fe25e4e1a543611f9a74481540ea5a5dc1063c1fcca185031c75c7ab450d4b7",
+  "images": 8
 }

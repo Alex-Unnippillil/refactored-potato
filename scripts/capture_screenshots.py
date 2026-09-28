@@ -31,12 +31,17 @@ def main():
         opts={'headless':True}
         if os.getenv('BROWSER_EXECUTABLE'):opts['executable_path']=os.environ['BROWSER_EXECUTABLE']
         browser=p.chromium.launch(**opts)
-        for name,route,width,height in [('workspace-desktop','/',1440,1080),('workspace-mobile','/',390,1100),('operations-desktop','/operations',1440,1080),('operations-mobile','/operations',390,1100),('schedules-desktop','/operations',1440,1080),('schedules-mobile','/operations',390,1100)]:
+        for name,route,width,height in [('workspace-desktop','/',1440,1080),('workspace-mobile','/',390,1100),('operations-desktop','/operations',1440,1080),('operations-mobile','/operations',390,1100),('schedules-desktop','/operations',1440,1080),('schedules-mobile','/operations',390,1100),('evidence-desktop','/',1440,1200),('evidence-mobile','/',390,1100)]:
             context=browser.new_context(viewport={'width':width,'height':height},device_scale_factor=2,locale='en-CA',timezone_id='UTC',reduced_motion='reduce')
             page=context.new_page();page.on('pageerror',lambda exc:errors.append(str(exc)))
             page.goto(args.base_url+route,wait_until='networkidle')
             if route=='/':expect(page.locator('#results .job-card')).to_have_count(12)
             else:expect(page.locator('#metric-jobs')).to_have_text('24')
+            if name.startswith('evidence-'):
+                page.locator('.suggestions [data-example="calm"]').click()
+                expect(page.locator('#results')).to_have_attribute('aria-busy','false')
+                page.locator('#results [data-detail]').first.click()
+                expect(page.locator('.preference-audit')).to_be_visible()
             assert not page.evaluate('document.documentElement.scrollWidth > innerWidth'),name+' overflows'
             assert page.locator('img').evaluate_all('(imgs)=>imgs.every(i=>i.complete && i.naturalWidth>0)'),name+' has broken images'
             if name.startswith('schedules-'):
@@ -49,8 +54,8 @@ def main():
     assert not errors,errors
     files=sorted(p for folder in ('rolecraft','public') for p in (ROOT/folder).glob('*') if p.suffix in ('.py','.js','.html','.css','.svg'))+[ROOT/'app.py']
     digest=hashlib.sha256(b''.join(str(p.relative_to(ROOT)).encode()+b'\0'+p.read_bytes() for p in files)).hexdigest()
-    (output/'capture.json').write_text(json.dumps({'mode':'fictional demo','transport':'real HTTP; no browser mocks','device_scale_factor':2,'source_sha256':digest,'images':6},indent=2)+'\n')
-    print('Captured six real-HTTP demo screenshots; no browser errors or horizontal overflow.')
+    (output/'capture.json').write_text(json.dumps({'mode':'fictional demo','transport':'real HTTP; no browser mocks','device_scale_factor':2,'source_sha256':digest,'images':8},indent=2)+'\n')
+    print('Captured eight real-HTTP demo screenshots; no browser errors or horizontal overflow.')
 
 
 if __name__=='__main__':main()
