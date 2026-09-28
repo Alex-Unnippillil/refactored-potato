@@ -40,10 +40,14 @@ def provider_json(url: str, key: str, payload: dict, timeout: float = 18) -> Any
                         if len(body) > 8_000_000:
                             raise ProviderError('The provider response exceeded the safety limit.')
                     return json.loads(body)
-        except httpx.HTTPError as exc:
+        except (httpx.TimeoutException, httpx.NetworkError, httpx.RemoteProtocolError) as exc:
             if attempt == 0:
                 continue
             raise ProviderUnavailable('An upstream provider could not be reached.') from exc
+        except (httpx.HTTPError, httpx.InvalidURL) as exc:
+            # Local protocol/configuration errors and invalid content encodings
+            # are not outages. Do not retry or silently switch retrieval modes.
+            raise ProviderError('The provider request or response violated its protocol contract.') from exc
         except ValueError as exc:
             raise ProviderError('The provider returned invalid JSON.') from exc
     raise ProviderUnavailable('An upstream provider is temporarily unavailable.')

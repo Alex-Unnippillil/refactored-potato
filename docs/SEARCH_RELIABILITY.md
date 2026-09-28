@@ -39,12 +39,14 @@ A mixed or conflicting preference is never counted as supporting. Neutral and un
 
 | Failure or request | Behavior |
 |---|---|
-| Transport error or upstream HTTP 429, 500, 502, 503, 504 during query embedding | Hybrid search can use keyword retrieval with a persistent notice. Existing bounded retries still apply. |
+| Timeout, network interruption, remote protocol failure or upstream HTTP 429, 500, 502, 503, 504 during query embedding | Hybrid search can use keyword retrieval with a persistent notice. Existing bounded retries still apply. |
 | Explicit meaning-only mode (`semantic_weight=1`) | Fails; it never substitutes keyword results. |
 | `allow_keyword_fallback=false` | Fails; useful for strict evaluation and clients requiring semantic retrieval. |
-| Missing/wrong credentials, model/index mismatch, incompatible vectors, malformed provider JSON | Fails; configuration or schema failures are not hidden as transient outages. |
+| Missing/wrong credentials, model/index mismatch, incompatible vectors, malformed provider JSON, invalid content encoding or local request/protocol errors | Fails; configuration or schema failures are not hidden as transient outages. |
 | PostgreSQL, access-control or request-validation failure | Fails; these are never converted to successful degraded search. |
 | Explicit keyword mode (`semantic_weight=0`) or unfiltered browse | Does not request query embeddings. |
+
+Transport retries are limited to two attempts for timeouts, network errors and remote protocol failures. Invalid URLs, unsupported protocols, client protocol errors and response-decoding failures raise a safe `ProviderError` immediately; they are neither retried nor treated as temporary outages. Tests cover both exception classification and hybrid-search propagation, including an invalid gzip response.
 
 A fallback response has `retrieval_status: "keyword_fallback"`, a warning, `trace.degraded: true`, effective `trace.semantic_weight: 0`, and the original `trace.requested_semantic_weight`. The UI shows **Keywords only · fallback** and a persistent explanation; the evidence brief carries that warning too. A later successful search or explicit keyword request clears the old notice. A failed request clears old traces and results instead of implying the old retrieval succeeded. Every new hybrid request attempts semantic retrieval again: there is no sticky hidden fallback or process-local circuit breaker.
 
@@ -84,3 +86,5 @@ The authored eight-query fictional-corpus evaluator remains a regression diagnos
 - [PostgreSQL SET TRANSACTION](https://www.postgresql.org/docs/16/sql-set-transaction.html): repeatable-read and read-only transaction semantics.
 - [OpenAI embeddings](https://developers.openai.com/api/docs/guides/embeddings): embedding response contract and model dimensions.
 - [Cohere v2 rerank](https://docs.cohere.com/v2/reference/rerank): returned document indices and re-ranking API.
+
+- [HTTPX exception hierarchy](https://www.python-httpx.org/exceptions/): distinguish transport interruptions, local protocol errors and response decoding failures.
