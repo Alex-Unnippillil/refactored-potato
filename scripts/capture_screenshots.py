@@ -38,7 +38,7 @@ def main():
             if route=='/':expect(page.locator('#results .job-card')).to_have_count(12)
             else:expect(page.locator('#metric-jobs')).to_have_text('24')
             if name.startswith('evidence-'):
-                page.locator('[data-example="calm"]').click()
+                page.locator('.suggestions [data-example="calm"]').click()
                 expect(page.locator('#results')).to_have_attribute('aria-busy','false')
                 page.locator('#results [data-detail]').first.click()
                 expect(page.locator('.preference-audit')).to_be_visible()
