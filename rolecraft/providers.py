@@ -16,6 +16,10 @@ class ProviderError(RuntimeError):
     """Safe, public failure message; provider bodies and secrets are never logged."""
 
 
+class ProviderUnavailable(ProviderError):
+    """A transient transport/quota outage; only hybrid search may degrade."""
+
+
 def provider_json(url: str, key: str, payload: dict, timeout: float = 18) -> Any:
     if not key:
         raise ProviderError('The required provider is not configured.')
@@ -26,6 +30,8 @@ def provider_json(url: str, key: str, payload: dict, timeout: float = 18) -> Any
                     if response.status_code in (429, 502, 503, 504) and attempt == 0:
                         time.sleep(0.4)
                         continue
+                    if response.status_code in (429, 500, 502, 503, 504):
+                        raise ProviderUnavailable('An upstream provider is temporarily unavailable.')
                     if not response.is_success:
                         raise ProviderError('An upstream provider is unavailable. Please try again later.')
                     body = bytearray()
@@ -34,11 +40,13 @@ def provider_json(url: str, key: str, payload: dict, timeout: float = 18) -> Any
                         if len(body) > 8_000_000:
                             raise ProviderError('The provider response exceeded the safety limit.')
                     return json.loads(body)
-        except (httpx.HTTPError, ValueError) as exc:
+        except httpx.HTTPError as exc:
             if attempt == 0:
                 continue
-            raise ProviderError('An upstream provider could not be reached.') from exc
-    raise ProviderError('An upstream provider is temporarily unavailable.')
+            raise ProviderUnavailable('An upstream provider could not be reached.') from exc
+        except ValueError as exc:
+            raise ProviderError('The provider returned invalid JSON.') from exc
+    raise ProviderUnavailable('An upstream provider is temporarily unavailable.')
 
 
 def embed(texts: list[str]) -> list[list[float]]:
@@ -53,12 +61,22 @@ def embed(texts: list[str]) -> list[list[float]]:
         'model': model, 'input': texts, 'dimensions': EMBEDDING_DIMENSIONS,
     })
     try:
-        data = sorted(raw['data'], key=lambda x: x['index'])
+        data = raw['data']
+        if not isinstance(data, list) or len(data) != len(texts):
+            raise ValueError('Unexpected embedding count.')
+        if any(not isinstance(item, dict) or type(item.get('index')) is not int for item in data):
+            raise ValueError('Invalid embedding index type.')
+        data = sorted(data, key=lambda x: x['index'])
         if [x['index'] for x in data] != list(range(len(texts))):
             raise ValueError('Unexpected embedding indices.')
         vectors = [item['embedding'] for item in data]
-        if any(len(v) != EMBEDDING_DIMENSIONS or not all(isinstance(n, (int, float)) and math.isfinite(n) for n in v) for v in vectors):
-            raise ValueError('Invalid embedding contract.')
+        for vector in vectors:
+            if not isinstance(vector, list) or len(vector) != EMBEDDING_DIMENSIONS:
+                raise ValueError('Invalid embedding dimensions.')
+            if not all(type(n) in (int, float) and abs(n) <= 1e6 and math.isfinite(n) for n in vector):
+                raise ValueError('Invalid embedding values.')
+            if math.hypot(*vector) <= 1e-12:
+                raise ValueError('Zero or near-zero vectors cannot be cosine-ranked.')
         return vectors
     except (KeyError, TypeError, ValueError) as exc:
         raise ProviderError('The embedding provider returned an incompatible response.') from exc
@@ -73,7 +91,9 @@ def rerank(query: str, documents: list[str]) -> list[int] | None:
         'query': query, 'documents': documents, 'top_n': len(documents), 'max_tokens_per_doc': 2048,
     })
     try:
-        indices = [int(item['index']) for item in raw['results']]
+        indices = [item['index'] for item in raw['results']]
+        if any(type(index) is not int for index in indices):
+            raise ValueError('Invalid reranker index type.')
         if sorted(indices) != list(range(len(documents))):
             raise ValueError('Unexpected reranker indices.')
         return indices

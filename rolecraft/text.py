@@ -113,19 +113,6 @@ def cosine(a: list[float], b: list[float]) -> float:
 
 
 def evidence(description: str, query: str, preferences: list[str]) -> list[dict]:
-    wanted = set(preferences) | (themes(query) & set(LABELS))
-    sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+|\n+', description) if s.strip()]
-    found = []
-    for key in LABELS:
-        if key not in wanted:
-            continue
-        for sentence in sentences:
-            if any(has_phrase(sentence, p) for p in CONCEPTS[key]):
-                found.append({'theme': key, 'label': LABELS[key], 'quote': sentence[:500]})
-                break
-    if not found:
-        query_terms = set(tokens(query))
-        ranked = sorted(sentences, key=lambda s: len(query_terms & set(tokens(s))), reverse=True)
-        if ranked:
-            found.append({'theme': 'description', 'label': 'From the description', 'quote': ranked[0][:500]})
-    return found[:3]
+    # Imports stay local because the source evidence module shares token helpers.
+    from .signals import assess_preferences, excerpts
+    return excerpts(description, query, assess_preferences(description, preferences))

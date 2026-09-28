@@ -32,3 +32,9 @@ Queue and cancellation routes require the separate ingestion token. The operatio
 ## Source schedules (1.2)
 
 All schedule configuration and run-now endpoints require live PostgreSQL and the distinct ingestion token. The UI creates paused schedules and a separate worker flag opts into recurring dispatch. Fixed board-token validation prevents arbitrary target URLs; strict payload types, revision checks, admission caps and the existing daily job-attempt limits constrain writes. Pausing does not revoke a provider request already made. Client aborts do not undo committed mutations. No tokens enter local/session storage, screenshots, schedule rows or source bundles.
+
+## Search integrity and page locking (1.3)
+
+Only transient query-embedding failures may produce a disclosed keyword fallback for hybrid requests; hard filters are unchanged. Meaning-only, strict-mode, configuration, schema and database failures do not degrade. Source-cue wording never receives SQL or tool permissions and is not employer verification.
+
+Workspace lock/token replacement advances an access epoch, aborts client requests and removes in-memory result/brief/detail/export state. Obsolete responses cannot update the page. Locking does not revoke a server token, erase deliberately saved search presets, undo provider charges or cancel admitted imports. This remains a single private workspace with shared tokens, not multi-tenant authorization. See [search reliability](SEARCH_RELIABILITY.md).

@@ -44,7 +44,7 @@ const defaults = () => ({query:'',filters:{country:'',city:'',work_mode:'',level
 function readStorage(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } }
 const rawSaved = readStorage('rolecraft.saved.v1', []);
 const rawSearches = readStorage('rolecraft.searches.v1', []);
-const state = {request:defaults(),view:'discover',status:null,last:null,token:'',controller:null,sequence:0,cache:new Map(),compared:new Set(),
+const state = {request:defaults(),view:'discover',status:null,last:null,token:'',controller:null,sequence:0,epoch:0,inflight:new Set(),cache:new Map(),compared:new Set(),
   saved:new Set(Array.isArray(rawSaved) ? rawSaved.filter(x => typeof x === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(x)).slice(0,200) : []),
   searches:Array.isArray(rawSearches) ? rawSearches.filter(x => x && typeof x.name === 'string' && x.request && typeof x.request === 'object').slice(0,10) : []};
 let toastTimer;
@@ -64,8 +64,11 @@ function cacheJobs(jobs) { jobs.forEach(j => state.cache.set(j.id,j)); }
 
 async function api(path, payload, options = {}) {
   const controller = new AbortController();
+  const epoch = state.epoch;
+  state.inflight.add(controller);
   const timer = setTimeout(() => controller.abort(), 55000);
   const abort = () => controller.abort();
+  if (options.signal?.aborted) controller.abort();
   if (options.signal) options.signal.addEventListener('abort', abort, {once:true});
   const token = options.token ?? state.token;
   try {
@@ -73,13 +76,18 @@ async function api(path, payload, options = {}) {
       headers:{...(payload === undefined ? {} : {'Content-Type':'application/json'}), ...(token ? {'Authorization':`Bearer ${token}`} : {})},
       body:payload === undefined ? undefined : JSON.stringify(payload),signal:controller.signal,cache:'no-store'});
     const data = await response.json().catch(() => ({detail:'The server returned an unexpected response.'}));
+    if (epoch !== state.epoch) throw Object.assign(new Error('Access changed.'), {obsolete:true});
     if (!response.ok) {
       const error = new Error(typeof data.detail === 'string' ? data.detail : 'Check your input and try again.');
       error.status = response.status;
       throw error;
     }
     return data;
+  } catch (error) {
+    if (epoch !== state.epoch) error.obsolete = true;
+    throw error;
   } finally {
+    state.inflight.delete(controller);
     clearTimeout(timer);
     options.signal?.removeEventListener('abort', abort);
   }
@@ -145,8 +153,8 @@ function jobCard(job) {
     <div class="job-location">${icon('map-pin')}<span>${esc(job.city)}</span><span class="meta-dot">·</span><span>${esc(job.work_mode)}</span></div>
     <div class="salary">${icon('wallet')}${esc(salary(job))}${job.salary_period ? '<span class="salary-period">/ year</span>' : ''}</div>
     <div class="job-tags">${[...(job.skills || []).slice(0,2),job.level !== 'Unknown' ? job.level : 'Level unspecified'].map(t => `<span>${esc(t)}</span>`).join('')}</div>
-    <div class="match-signal">${icon(job.fit === 'Strong signals' ? 'check' : 'sparkles')}${esc(job.fit || 'Saved for a closer look')}</div>
-    <div class="job-card-bottom"><span class="source-badge">${icon(job.is_demo ? 'info' : 'link')}${esc(job.is_demo ? 'Illustrative role' : job.source)}</span><button class="detail-link" data-detail="${esc(job.id)}">${job.evidence ? 'See why it fits' : 'View details'}${icon('arrow-up-right')}</button></div>
+    <div class="match-signal ${job.retrieval_explanation?.conflicting_preferences ? 'conflict-signal' : ''}">${icon(job.retrieval_explanation?.conflicting_preferences ? 'info' : 'sparkles')}${esc(job.fit || 'Saved for a closer look')}</div>
+    <div class="job-card-bottom"><span class="source-badge">${icon(job.is_demo ? 'info' : 'link')}${esc(job.is_demo ? 'Illustrative role' : job.source)}</span><button class="detail-link" data-detail="${esc(job.id)}">${job.evidence ? 'Inspect evidence' : 'View details'}${icon('arrow-up-right')}</button></div>
     <label class="compare-label"><input type="checkbox" data-compare="${esc(job.id)}" ${compared ? 'checked' : ''}>Compare role</label>
   </article>`;
 }
@@ -165,13 +173,18 @@ function renderResults() {
   $('trace-retrieval').textContent = `${data.trace.lexical_candidates} keyword + ${data.trace.semantic_candidates} vector candidates.`;
   $('trace-rank').textContent = `${data.total} results · ${data.trace.total_ms} ms end-to-end.`;
   $('pipeline-trace').textContent = JSON.stringify(data.trace,null,2);
-  if (data.warnings.length) toast(data.warnings[0]);
+  const strategies = {browse:'Browse · filters applied',hybrid:'Hybrid search',keywords:'Keywords only',semantic:'Meaning only',keyword_fallback:'Keywords only · fallback'};
+  $('retrieval-status').textContent = strategies[data.retrieval_status] || 'Search complete';
+  $('search-notice').textContent = data.warnings.join(' ');
+  $('search-notice').hidden = !data.warnings.length;
 }
 async function runSearch() {
   readForm(); updateURL();
   state.controller?.abort();
   state.controller = new AbortController();
   const sequence = ++state.sequence;
+  state.last = null;
+  clearSearchTrace('Retrieving…');
   $('results').setAttribute('aria-busy','true');
   $('results').innerHTML = '<div class="skeleton" aria-hidden="true"></div>'.repeat(4);
   $('search-button').disabled = true;
@@ -182,7 +195,8 @@ async function runSearch() {
     if (sequence !== state.sequence) return;
     state.last = data; cacheJobs(data.jobs); renderResults();
   } catch(error) {
-    if (sequence !== state.sequence) return;
+    if (sequence !== state.sequence || error.obsolete) return;
+    clearSearchTrace('Search unavailable');
     const message = error.name === 'AbortError' ? 'The search timed out. Please try again.' : error.message;
     $('results').innerHTML = emptyState('Your search needs a moment.',message,'retry');
     $('results').setAttribute('aria-busy','false');
@@ -207,7 +221,7 @@ function toggleSaved(id) {
 async function loadSaved() {
   if (!state.saved.size) {renderSaved(); return;}
   $('saved-results').innerHTML = '<div class="skeleton" aria-hidden="true"></div>'.repeat(2);
-  try {const data = await api('/api/jobs',{ids:[...state.saved]}); cacheJobs(data.jobs); renderSaved(data.jobs);} catch(error) {$('saved-results').innerHTML = emptyState('Your shortlist is still on this device.',error.message,'retry-saved');}
+  try {const data = await api('/api/jobs',{ids:[...state.saved]}); cacheJobs(data.jobs); renderSaved(data.jobs);} catch(error) {if(error.obsolete)return;$('saved-results').innerHTML = emptyState('Your shortlist is still on this device.',error.message,'retry-saved');}
 }
 function renderSaved(available) {
   const jobs = available || [...state.saved].map(id => state.cache.get(id)).filter(Boolean);
@@ -226,14 +240,47 @@ function openDialog(html, kicker = 'A CLOSER LOOK') {
   if (!$('detail-dialog').open) $('detail-dialog').showModal();
   $('detail-dialog').scrollTop = 0;
 }
+const EVIDENCE_STATES = {supporting:'Supporting text',conflicting:'Conflicting text',mixed:'Mixed evidence',uncertain:'Uncertain wording',not_found:'Not stated'};
+function preferenceAudit(assessments) {
+  if (!assessments?.length) return '';
+  return `<section class="detail-section preference-audit"><h3>Selected preferences · source audit</h3><p class="brief-note">English lexical rules flag specific wording, negation and uncertainty. They can miss context. Read the full listing and confirm with the employer.</p>${assessments.map(a => `<article class="preference-check evidence-${esc(a.status)}"><div class="preference-check-heading"><strong>${esc(a.label)}</strong><span class="evidence-state">${esc(EVIDENCE_STATES[a.status] || 'Unconfirmed')}</span></div>${a.excerpts.map(e => `<blockquote data-polarity="${esc(e.polarity)}">“${esc(e.quote)}”</blockquote>`).join('')}${!a.excerpts.length ? '<p>No explicit wording found by these rules. This is not evidence that the benefit is absent.</p>' : ''}</article>`).join('')}</section>`;
+}
+function clearSearchTrace(label) {
+  $('retrieval-status').textContent = label;
+  $('search-notice').hidden = true; $('search-notice').textContent = '';
+  $('trace-filter').textContent = 'No current retrieval.';
+  $('trace-retrieval').textContent = 'No current candidates.';
+  $('trace-rank').textContent = 'No current ranking.';
+  $('pipeline-trace').textContent = '{}';
+}
+function invalidateAccess() {
+  ++state.epoch; ++state.sequence;
+  for (const controller of state.inflight) controller.abort();
+  state.controller?.abort(); state.token=''; state.last=null;
+  state.cache.clear(); state.compared.clear();
+  ++dialogVersion; $('detail-dialog').close(); $('dialog-content').innerHTML='';
+  $('results').innerHTML=emptyState('Workspace locked.','Unlock to retrieve roles. Saved IDs remain on this device.');
+  $('saved-results').innerHTML=emptyState('Workspace locked.','Unlock to load your saved roles.');
+  $('results').setAttribute('aria-busy','false');
+  $('results-count').textContent='—'; $('results-caption').textContent='No private results are displayed.';
+  $('pagination').hidden=true; $('connection-banner').hidden=true;
+  $('search-button').disabled=false; $('search-button').innerHTML='Find my next role'+icon('arrow-right');
+  $('ingest-token').value=''; $('ingest-board').value=''; $('ingest-url').value=''; $('ingest-result').textContent='';
+  $('access-token').value=''; $('lock-workspace').hidden=true;
+  $('ingest-button').disabled=state.status?.mode !== 'live';
+  clearTimeout(toastTimer); $('toast').hidden=true; $('toast').textContent='';
+  clearSearchTrace('Workspace locked'); updateCompare();
+}
 function openJob(id) {
   const job = state.cache.get(id); if (!job) {toast('This role is no longer in the current results.'); return;}
   const source = safeURL(job.source_url);
   const passages = job.evidence || [];
+  const explanation = job.retrieval_explanation;
   openDialog(`<div class="dialog-company">${brand(job)}<strong>${esc(job.company)}</strong></div><h2 id="dialog-title" class="dialog-title">${esc(job.title)}</h2><div class="dialog-meta"><span>${esc(job.city)} · ${esc(job.country)}</span><span>${esc(job.work_mode)}</span><span>${esc(salary(job))}${job.salary_period ? ' / year' : ''}</span></div>
     ${job.is_demo ? '<div class="detail-caveat">This company and vacancy are fictional. This role exists only to demonstrate search, filtering, and explanations.</div>' : `<div class="detail-caveat">Source: ${esc(job.source)} · Last imported ${esc(new Date(job.last_seen).toLocaleDateString())}. Source claims are not independently verified. Confirm that the role is still open.</div>`}
-    ${passages.length ? `<section class="detail-section"><h3>Why it surfaced</h3>${passages.map(e => `<div class="evidence-item"><strong>${icon('check')}${esc(e.label)}</strong><blockquote>“${esc(e.quote)}”</blockquote></div>`).join('')}<p class="brief-note">Exact passages from this description. Relevance signals are not a probability of qualification or an endorsement of company culture.</p></section>` : ''}
-    ${job.unconfirmed_preferences?.length ? `<div class="detail-caveat">Not confirmed in the description: ${esc(job.unconfirmed_preferences.join(', '))}. Ask about these in an interview.</div>` : ''}
+    ${explanation ? `<section class="detail-section"><h3>Why it surfaced</h3><div class="retrieval-facts"><span>Keyword rank <strong>${esc(explanation.keyword_rank ?? 'Not retrieved')}</strong></span><span>Meaning rank <strong>${esc(explanation.semantic_rank ?? 'Not retrieved')}</strong></span><span>Supporting preferences <strong>${esc(explanation.supporting_preferences)}</strong></span><span>Conflicting preferences <strong>${esc(explanation.conflicting_preferences)}</strong></span></div><p class="brief-note">Ranks reflect candidate retrieval, not probability or qualification. An optional cross-encoder may change the final order.</p></section>` : ''}
+    ${preferenceAudit(job.preference_assessments)}
+    ${!job.preference_assessments?.length && passages.length ? `<section class="detail-section"><h3>From the description</h3>${passages.map(e => `<blockquote>“${esc(e.quote)}”</blockquote>`).join('')}<p class="brief-note">Select preference controls to check supporting, conflicting, uncertain or unstated text.</p></section>` : ''}
     <section class="detail-section"><h3>The role & the team</h3><p class="description-copy">${esc(job.description)}</p></section><section class="detail-section"><h3>Location & eligibility</h3><p class="description-copy">${esc(job.remote_scope)}</p></section>
     ${job.scores ? `<details class="detail-section"><summary>Inspect retrieval scores</summary><p class="brief-note">Raw retrieval diagnostics, not percentages. Different retriever scales are combined by rank, not added directly.</p><pre>${esc(JSON.stringify(job.scores,null,2))}</pre></details>` : ''}
     <div class="dialog-actions"><button class="secondary-button" data-save="${esc(id)}" aria-pressed="${state.saved.has(id)}">${icon('bookmark')}${state.saved.has(id) ? 'Saved to shortlist' : 'Save this role'}</button>${!job.is_demo && source ? `<a class="primary-button" href="${esc(source)}" target="_blank" rel="noopener noreferrer">View original listing${icon('arrow-up-right')}</a>` : '<button class="primary-button" disabled>Illustrative role · no application</button>'}</div>`);
@@ -252,8 +299,8 @@ async function buildBrief() {
   try {
     const data = await api('/api/brief',state.request);
     if (!$('detail-dialog').open || version !== dialogVersion) return;
-    openDialog(`<h2 id="dialog-title" class="dialog-title">${esc(data.heading)}</h2><div class="card-eyebrow">${esc(data.method)}</div>${data.warning ? `<div class="detail-caveat">${esc(data.warning)}</div>` : ''}${data.cards.map((card,i) => `<article class="brief-card"><div class="card-eyebrow">0${i+1} · ${card.is_demo ? 'ILLUSTRATIVE ROLE' : 'SOURCE-BACKED EXCERPT'}</div><h3>${esc(card.title)}</h3><div class="company-name">${esc(card.company)}</div><blockquote>“${esc(card.quote)}”</blockquote><p class="brief-note">${esc(card.caveats.filter(Boolean).join(' · '))}</p>${safeURL(card.source_url) && !card.is_demo ? `<a class="text-button" href="${esc(safeURL(card.source_url))}" target="_blank" rel="noopener noreferrer">Verify at the original source${icon('arrow-up-right')}</a>` : ''}</article>`).join('')}<p class="brief-note">${esc(data.note)}</p>${!data.cards.length ? '<div class="detail-caveat">Try relaxing a filter. Hard constraints are never silently removed.</div>' : ''}`,'YOUR EVIDENCE BRIEF');
-  } catch(error) { if ($('detail-dialog').open && version === dialogVersion) openDialog(`<h2 id="dialog-title" class="dialog-title">The brief isn’t ready.</h2><p class="brief-note">${esc(error.message)}</p>`); }
+    openDialog(`<h2 id="dialog-title" class="dialog-title">${esc(data.heading)}</h2><div class="card-eyebrow">${esc(data.method)}</div>${data.warning ? `<div class="detail-caveat">${esc(data.warning)}</div>` : ''}${data.cards.map((card,i) => `<article class="brief-card"><div class="card-eyebrow">0${i+1} · ${card.is_demo ? 'ILLUSTRATIVE ROLE' : 'SOURCE-BACKED EXCERPT'}</div><h3>${esc(card.title)}</h3><div class="company-name">${esc(card.company)}</div><blockquote>“${esc(card.quote)}”</blockquote><p class="brief-note">${esc(card.caveats.filter(Boolean).join(' · '))}</p>${safeURL(card.source_url) && !card.is_demo ? `<a class="text-button" href="${esc(safeURL(card.source_url))}" target="_blank" rel="noopener noreferrer">Verify at the original source${icon('arrow-up-right')}</a>` : ''}</article>`).join('')}<p class="brief-note">${esc(data.note)}</p>${data.cards.some(c => c.preference_assessments?.some(a => ['conflicting','mixed'].includes(a.status))) ? '<div class="detail-caveat">Some source text conflicts with your preferences. Inspect those roles before shortlisting.</div>' : ''}${!data.cards.length ? '<div class="detail-caveat">Try relaxing a filter. Hard constraints are never silently removed.</div>' : ''}`,'YOUR EVIDENCE BRIEF');
+  } catch(error) { if(error.obsolete)return; if ($('detail-dialog').open && version === dialogVersion) openDialog(`<h2 id="dialog-title" class="dialog-title">The brief isn’t ready.</h2><p class="brief-note">${esc(error.message)}</p>`); }
 }
 function renderSearches() {
   $('saved-search-list').innerHTML = state.searches.length ? state.searches.map((s,i) => `<div class="saved-search-item"><button data-search-index="${i}" title="${esc(s.name)}">${esc(s.name)}</button><button data-delete-search="${i}" aria-label="Delete saved search ${esc(s.name)}">${icon('x')}</button></div>`).join('') : '<p class="muted small">Keep a good search for later.</p>';
@@ -307,12 +354,13 @@ function showStatus(status) {
 }
 async function syncSource(event) {
   event.preventDefault();
+  const epoch=state.epoch;
   const token=$('ingest-token').value; $('ingest-token').value='';
   const payload={provider:$('ingest-provider').value,board:$('ingest-board').value.trim(),url:$('ingest-url').value.trim(),limit:5,offset:0};
   $('ingest-button').disabled=true; $('ingest-result').textContent='Importing and validating a bounded batch…';
   try {const result=await api('/api/ingest',payload,{token}); $('ingest-result').textContent=`${result.indexed} roles indexed from ${result.source}. ${result.next_offset !== null ? `More roles remain: use the CLI with --all to sync every batch (next offset ${result.next_offset}). ` : ''}${result.note}`;}
-  catch(error) {$('ingest-result').textContent=error.name === 'AbortError' ? 'The request timed out. Its completion is unknown; inspect the source before retrying. Imports are idempotent.' : error.message;}
-  finally {$('ingest-button').disabled=state.status?.mode !== 'live';}
+  catch(error) {if(error.obsolete)return;$('ingest-result').textContent=error.name === 'AbortError' ? 'The request timed out. Its completion is unknown; inspect the source before retrying. Imports are idempotent.' : error.message;}
+  finally {if(epoch===state.epoch)$('ingest-button').disabled=state.status?.mode !== 'live';}
 }
 
 hydrateIcons(); loadFromURL(); renderSavedCount(); renderSearches();
@@ -333,9 +381,10 @@ $('compare-clear').addEventListener('click',() => {state.compared.clear();update
 $('detail-dialog').addEventListener('close', () => dialogVersion++);
 $('close-dialog').addEventListener('click',() => $('detail-dialog').close());
 $('access-button').addEventListener('click',() => $('access-dialog').showModal());
+$('lock-workspace').addEventListener('click',() => {invalidateAccess();state.request=defaults();syncForm();updateURL();$('access-button').focus();});
 $('close-access').addEventListener('click',() => $('access-dialog').close());
 $('access-dialog').addEventListener('close',() => $('access-token').value='');
-$('access-form').addEventListener('submit',event => {event.preventDefault();state.token=$('access-token').value;$('access-token').value='';$('access-dialog').close();if(state.view === 'saved') loadSaved();else runSearch();});
+$('access-form').addEventListener('submit',event => {event.preventDefault();const token=$('access-token').value;invalidateAccess();state.token=token;$('lock-workspace').hidden=!token;$('access-token').value='';$('access-dialog').close();if(state.view === 'saved') loadSaved();else runSearch();});
 $('ingest-form').addEventListener('submit',syncSource);
 $('ingest-provider').addEventListener('change',() => {const web=$('ingest-provider').value === 'firecrawl';$('board-label').hidden=web;$('url-label').hidden=!web;});
 $('share-search').addEventListener('click',async() => {readForm();updateURL();try{await navigator.clipboard.writeText(location.href);toast('Search link copied.');}catch{openDialog(`<h2 id="dialog-title" class="dialog-title">Share a thoughtful search.</h2><p class="brief-note">Copy this link. It contains filters, not access tokens.</p><p class="description-copy">${esc(location.href)}</p>`);}});
@@ -343,7 +392,7 @@ $('clear-saved').addEventListener('click',() => {if(state.saved.size && confirm(
 $('export-saved').addEventListener('click',async() => {
   if(!state.saved.size){toast('Save a role before exporting your shortlist.');return;}
   try {const data=await api('/api/jobs',{ids:[...state.saved]});const blob=new Blob([JSON.stringify({app:'Rolecraft',version:1,exported_at:new Date().toISOString(),saved_ids:[...state.saved],jobs:data.jobs},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='rolecraft-shortlist.json';link.click();setTimeout(() => URL.revokeObjectURL(url),1000);toast('Shortlist exported, including retained saved IDs.');}
-  catch(error){toast(error.message);}
+  catch(error){if(error.obsolete)return;toast(error.message);}
 });
 document.addEventListener('click',event => {
   const button=event.target.closest('button');if(!button)return;
@@ -366,6 +415,6 @@ window.addEventListener('storage',event => {if(event.key==='rolecraft.saved.v1')
 async function start() {
   setView(state.view,false);
   try {showStatus(await api('/api/status'));await runSearch();}
-  catch(error){$('connection-banner').textContent='The workspace could not be reached. '+error.message;$('connection-banner').hidden=false;$('results').innerHTML=emptyState('Let’s reconnect.',error.message,'retry');$('results').setAttribute('aria-busy','false');}
+  catch(error){if(error.obsolete)return;$('connection-banner').textContent='The workspace could not be reached. '+error.message;$('connection-banner').hidden=false;$('results').innerHTML=emptyState('Let’s reconnect.',error.message,'retry');$('results').setAttribute('aria-busy','false');}
 }
 start();

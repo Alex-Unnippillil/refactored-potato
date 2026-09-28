@@ -13,7 +13,7 @@ def make_brief(request: SearchRequest, store=None) -> dict:
     jobs = retrieval['jobs']
     choices = [{'job_id': job['id'], 'quote': job['evidence'][0]['quote']} for job in jobs]
     method = 'Extractive brief · no generative model'
-    warning = None
+    warning = ' '.join(retrieval['warnings']) or None
     model = os.getenv('OPENAI_CHAT_MODEL', '')
     if jobs and model and retrieval['mode'] == 'live':
         # The model can only select source passages. No tools, URL fetching, SQL,
@@ -36,14 +36,15 @@ def make_brief(request: SearchRequest, store=None) -> dict:
                 raise ValueError('Ungrounded model response.')
             choices, method = proposed, 'AI-selected excerpts · source-verified'
         except (ProviderError, KeyError, ValueError, TypeError):
-            warning = 'AI selection was unavailable or failed citation validation. Verified source excerpts are shown instead.'
+            warning = ((warning + ' ') if warning else '') + 'AI selection was unavailable or failed citation validation. Verified source excerpts are shown instead.'
     lookup = {j['id']:j for j in jobs}
     cards = []
     for choice in choices:
         job = lookup[choice['job_id']]
         cards.append({'id':job['id'],'title':job['title'],'company':job['company'],'quote':choice['quote'],
             'source_url':job['source_url'],'is_demo':job['is_demo'],
-            'caveats': [*job['unconfirmed_preferences'], 'Salary is not disclosed.' if job['salary_min'] is None else '', job['remote_scope']]})
+            'preference_assessments': job['preference_assessments'],
+            'caveats': [*(a['label'] + ': ' + a['status'].replace('_', ' ') for a in job['preference_assessments'] if a['status'] != 'supporting'), 'Salary is not disclosed.' if job['salary_min'] is None else '', job['remote_scope']]})
     return {'heading':f'{len(cards)} roles worth a closer look' if cards else 'No roles meet this search',
-        'method':method,'cards':cards,'mode':retrieval['mode'],'warning':warning,
+        'method':method,'cards':cards,'mode':retrieval['mode'],'warning':warning, 'retrieval_status':retrieval['retrieval_status'],
         'note':'These are signals from job descriptions, not independently verified workplace claims. Confirm pay, culture, and eligibility with the employer.'}

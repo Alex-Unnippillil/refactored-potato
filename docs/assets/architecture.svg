@@ -3,9 +3,9 @@
 <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8" fill="#6c8751"/></marker></defs>
 <rect width="1440" height="1390" fill="#f7f8f3"/>
 <g font-family="Arial, Helvetica, sans-serif" fill="#183d2e">
-<text x="48" y="58" font-size="14" font-weight="700" fill="#5e7a47">ROLECRAFT 1.2</text>
-<text x="48" y="103" font-size="32" font-weight="700" fill="#183d2e">Hybrid search. Scheduled refreshes. Visible operations.</text>
-<text x="48" y="134" font-size="16" font-weight="400" fill="#52634d">The database owns durable state. The web server never pretends an in-process task is a persistent worker.</text>
+<text x="48" y="58" font-size="14" font-weight="700" fill="#5e7a47">ROLECRAFT 1.3</text>
+<text x="48" y="103" font-size="32" font-weight="700" fill="#183d2e">Hybrid search. Explicit fallback. Source evidence.</text>
+<text x="48" y="134" font-size="16" font-weight="400" fill="#52634d">Read snapshots protect search integrity while the separate worker refreshes sources. No invented culture guarantees.</text>
 <rect x="28" y="168" width="1384" height="222" rx="14" fill="#edf3e5" stroke="#c6d5ba"/>
 <text x="48" y="197" font-size="12" font-weight="700" fill="#183d2e">SEARCH PATH  /  Browser → authenticated FastAPI → the same SQL-eligible records</text>
 <rect x="48" y="219" width="300" height="137" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
@@ -17,7 +17,7 @@
 <rect x="396" y="219" width="300" height="137" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
 <text x="416" y="245" font-size="11" font-weight="700" fill="#5e7a47">02 / CONSTRAIN</text>
 <text x="416" y="273" font-size="18" font-weight="700" fill="#183d2e">SQL hard filters</text>
-<text x="416" y="299" font-size="13" font-weight="400" fill="#52634d">Parameterized values only</text>
+<text x="416" y="299" font-size="13" font-weight="400" fill="#52634d">One repeatable-read snapshot</text>
 <text x="416" y="320" font-size="13" font-weight="400" fill="#52634d">Active + fresh + non-expired jobs</text>
 <text x="416" y="341" font-size="13" font-weight="400" fill="#52634d">Unknown pay does not pass a floor</text>
 <rect x="744" y="219" width="300" height="137" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
@@ -25,13 +25,13 @@
 <text x="764" y="273" font-size="18" font-weight="700" fill="#183d2e">Words + meaning</text>
 <text x="764" y="299" font-size="13" font-weight="400" fill="#52634d">PostgreSQL full-text retrieval</text>
 <text x="764" y="320" font-size="13" font-weight="400" fill="#52634d">pgvector exact cosine on chunks</text>
-<text x="764" y="341" font-size="13" font-weight="400" fill="#52634d">Both branches obey the filters</text>
+<text x="764" y="341" font-size="13" font-weight="400" fill="#52634d">Transient outage: keyword fallback</text>
 <rect x="1092" y="219" width="300" height="137" rx="14" fill="#ffffff" stroke="#c6d5ba"/>
 <text x="1112" y="245" font-size="11" font-weight="700" fill="#5e7a47">04 / EXPLAIN</text>
 <text x="1112" y="273" font-size="18" font-weight="700" fill="#183d2e">Fuse, rank, cite</text>
 <text x="1112" y="299" font-size="13" font-weight="400" fill="#52634d">Job-level deduplication + RRF</text>
 <text x="1112" y="320" font-size="13" font-weight="400" fill="#52634d">Optional Cohere re-ranking</text>
-<text x="1112" y="341" font-size="13" font-weight="400" fill="#52634d">Verified excerpts; no culture scores</text>
+<text x="1112" y="341" font-size="13" font-weight="400" fill="#52634d">Support / conflict / uncertainty</text>
 <path d="M349 288 L391 288" fill="none" stroke="#6c8751" stroke-width="2" marker-end="url(#arrow)"/>
 <path d="M697 288 L739 288" fill="none" stroke="#6c8751" stroke-width="2" marker-end="url(#arrow)"/>
 <path d="M1045 288 L1087 288" fill="none" stroke="#6c8751" stroke-width="2" marker-end="url(#arrow)"/>

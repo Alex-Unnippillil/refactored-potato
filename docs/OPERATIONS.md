@@ -38,3 +38,9 @@ Apply all numbered migrations with `python scripts/manage.py migrate` before upg
 ## Release 1.2: opt-in source scheduling
 
 Apply `003_schedules.sql` before upgrading. New schedules start paused in the interface; the worker separately requires `IMPORT_SCHEDULER_ENABLED=true`. Source freshness diagnostics, revision-checked operator controls, atomic shared-queue admission, budget deferral and rollback instructions are in [SCHEDULED_SOURCES.md](SCHEDULED_SOURCES.md). Schedule pause/removal does not cancel admitted work or delete indexed roles.
+
+## Version 1.3 search acceptance
+
+This release introduces no migration beyond 001–003. Confirm `/api/health` and readiness report the deployed version. Inspect `retrieval_status` and both effective/requested weights: `keyword_fallback` is degraded retrieval, not successful semantic service health. A source-audit supporting phrase is a listing claim, not a verified workplace benefit.
+
+Saved IDs may outlive a listing; stale/expired jobs are now omitted from lookup/export. A single search uses a repeatable-read snapshot; separate page requests may see newer imports. Run the staging outage/meaning-only/locking checks in [SEARCH_RELIABILITY.md](SEARCH_RELIABILITY.md) before live acceptance. Provider fixtures and screenshot/demo checks are not a paid-provider production smoke test.
