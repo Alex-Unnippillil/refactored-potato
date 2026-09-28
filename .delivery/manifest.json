@@ -1,0 +1,32 @@
+{
+  "base": "c0156903b9bb43e0b0438e8fc99d59017330aa65",
+  "sha256": "36f4b27d3822e6bf188e09de5d60003aa44df294367910618b981f8f7ecdb6ad",
+  "parts": 4,
+  "files": {
+    "CHANGELOG.md": "8e28ee0873d7adfeaf3ace6384edc0586f8a9edc01433690fa1b540748c07f33",
+    "README.md": "b1b7a069a707fcb7f41f9a67cd962ef388bd62a0d3fdc5cf255b3410e09ea782",
+    "app.py": "7c9e713a7573e4eba882077f54f2082bc2fda01466dfd0013ef39eebccaccd7a",
+    "docs/OPERATIONS.md": "f38fe334df2e243280eb3779971d0d4215594122de89bb5c82b81f487733ea34",
+    "docs/SEARCH_RELIABILITY.md": "8b3f84d3670ced6ad4e3f84ec2fad58ed4dbcbd87add09686b9002d63bfeacb2",
+    "docs/SECURITY.md": "43fdc26bb4853418f6207d6880d46385fac8dbfca6f5b9ed8ad5b29a0e7a0a39",
+    "docs/architecture.dot": "062822379dadbcac5bd8e2ba553456207065883127930e67b1fd9e20e733f5f6",
+    "docs/assets/architecture.svg": "5a21851b14fdaf99b7f071f05254cbe407677145fd436eb4ae23a0c8bca3f229",
+    "public/app.js": "3c31bb3c4fe5ffde1f847e61b8bd546bc76ee6d2ac9d40ba91edc9cfd3d27aac",
+    "public/index.html": "7d8c45dcb0dc5af4d01a86e4a8ef574809d3610e90ee96b53bd7daecfb4cb589",
+    "public/styles.css": "cfe3b1f3b1fbdd0661c175e93b251137ce938797a9296031132b5367941bc077",
+    "rolecraft/__init__.py": "53074376dd6905b2741dc137d3248af91d2df4401503e59515ecd86e55a94675",
+    "rolecraft/brief.py": "384e0570f9f6c84b63fe0609a52fe9e67ec72c3e56bb58af81b97beecc95d267",
+    "rolecraft/models.py": "589003b9b2a1d33749b4891e49a014e7e4dbeb4aa16b88dc8d88058b002642c9",
+    "rolecraft/operations.py": "926b6bdae16f4c91d52cdbe59520d2e9932269c38bed871023c6dcf7be949c98",
+    "rolecraft/providers.py": "a74f0a198bf6086eb5c60c2e930714e4e48286495674afa121b9d79c8bf34994",
+    "rolecraft/search.py": "ac136082008671989158409aaf7b43cbeb3810ce069381b96982b2564552b9fd",
+    "rolecraft/signals.py": "396b4a07af31a2ad74b7b268b268bf9834b15fc2a2040405f251b30b41a39532",
+    "rolecraft/store.py": "783d58449695f1d421fbf78c825e9b018155c1340ec9fe08aed9d2b9317efada",
+    "rolecraft/text.py": "a05a8dfc553ba31e045ddc0b071e3634447cb2963f9e89d560d657f0021a4865",
+    "scripts/capture_screenshots.py": "da3aa5e050f056576a74403123ce9df7d4430d9a3a4eb9cc7640c82a1d028973",
+    "scripts/render_architecture.py": "7e0a5e6d0f68372853c3bbcba88486538c9cc42d3f35994548d5437c1ee07b9d",
+    "tests/test_postgres.py": "c41bad242cf933bf022787818ab626e68c0f08ebab8b2dbb869cf55fd5d2c9d8",
+    "tests/test_reliability_ui.py": "5f63178cba98bc608aa5e31118bf7e53268b0eb763926d94828ab9535b678fce",
+    "tests/test_search_reliability.py": "634217168447dc506c2ce3fd37e0a549a790931ac38d12655dd24ae6d8f7fc23"
+  }
+}
