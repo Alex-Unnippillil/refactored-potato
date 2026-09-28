@@ -19,7 +19,7 @@ pytestmark = pytest.mark.skipif(not os.getenv('RUN_UI_TESTS'), reason='Requires 
 
 
 def test_selected_preferences_expose_source_audit(page):
-    page.locator('[data-example="calm"]').click()
+    page.locator('.suggestions [data-example="calm"]').click()
     expect(page.locator('#results')).to_have_attribute('aria-busy', 'false')
     page.locator('#results [data-detail]').first.click()
     expect(page.locator('.preference-audit')).to_be_visible()
@@ -32,7 +32,7 @@ def test_selected_preferences_expose_source_audit(page):
 @pytest.mark.parametrize('width', [320, 390])
 def test_evidence_audit_mobile_and_keyboard(page, width):
     page.set_viewport_size({'width': width, 'height': 900})
-    page.locator('[data-example="calm"]').click()
+    page.locator('.suggestions [data-example="calm"]').click()
     expect(page.locator('#results')).to_have_attribute('aria-busy', 'false')
     page.locator('#results [data-detail]').first.focus()
     page.keyboard.press('Enter')
